@@ -149,7 +149,7 @@ def index():
         try:
             # Start the subprocess and store the process handle
             model_process = subprocess.Popen([
-                '/usr/bin/python3', MODEL_SCRIPT,
+                'python', MODEL_SCRIPT,
                 '--date', date,
                 '--cycle', cycle,
                 '--starting_step', str(starting_step),

@@ -6,6 +6,7 @@ from timezonefinder import TimezoneFinder
 import pytz
 import pandas as pd
 from scipy.interpolate import interp1d
+import os
 
 def median_across_radius(list):
     """
@@ -264,7 +265,7 @@ def process_frame(points_data_dict, ds, step, starting_step, delta_t, gefs, eps)
         points_data_dict[point]['times'].append((datetime_date_cycle + timedelta(hours=delta_t * (len(points_data_dict[point]['times']) + 1))).strftime('%Y-%m-%d %H:%M:%S'))
 
     # Save to JSON
-    with open('data/points_data.json', 'w') as f:
+    with open(os.path.join(os.getcwd(), 'data', 'points_data.json'), 'w') as f:
         json.dump(points_data_dict, f)
 
     return points_data_dict
@@ -277,7 +278,7 @@ def interpolate_hourly(delta_t):
     to 'data/points_data_hourly.json'.
     """
     # Load the JSON data
-    with open('data/points_data.json', 'r') as file:
+    with open(os.path.join(os.getcwd(), 'data', 'points_data.json'), 'r') as file:
         points_data_dict = json.load(file)
 
     def interpolate_times(times):
@@ -330,5 +331,5 @@ def interpolate_hourly(delta_t):
             points_data_dict[resort]['exceedance_probabilities'][threshold] = interpolated_data.tolist()
 
     # Save the modified data to a new JSON file
-    with open('data/points_data_hourly.json', 'w') as outfile:
+    with open(os.path.join(os.getcwd(), 'data', 'points_data_hourly.json'), 'w') as outfile:
         json.dump(points_data_dict, outfile)

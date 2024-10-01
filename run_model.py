@@ -14,7 +14,7 @@ import src.processing.dataset as dataset_processing
 import src.processing.points as points_processing
 import src.plotting.plot_points as plot_points
 
-PROGRESS_FILE = os.path.join(os.getcwd(), 'data/progress.json')
+PROGRESS_FILE = os.path.join(os.getcwd(), 'data', 'progress.json')
 terminate = False
 
 def signal_handler(signum, frame):
@@ -137,7 +137,7 @@ def main(args):
 
         if eps:
             try:
-                ds = xr.load_dataset(f'data/ecmwf_{step}.grib2', engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'ecmwf_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
                 ds = dataset_processing.crop(ds, points_list)
             except Exception as e:
                 print(f"Error loading EPS dataset for step {step}: {e}")
@@ -146,14 +146,14 @@ def main(args):
 
         if gefs:
             try:
-                gefs_ds = xr.load_dataset(f'data/gefs_{step}.grib2', engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                gefs_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'gefs_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
                 if step != 3 and step % 6 == 0 and delta_t == 3:
-                    prior_gefs_ds = xr.load_dataset(f'data/gefs_{step-3}.grib2', engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                    prior_gefs_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'gefs_{step-3}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
                     gefs_ds = gefs_ds - prior_gefs_ds
                 gefs_ds = gefs_ds.assign_coords(longitude=(((gefs_ds.longitude + 180) % 360) - 180)).sortby('longitude')
                 gefs_ds = dataset_processing.crop(gefs_ds, points_list)
 
-                p_gefs_ds = xr.load_dataset(f'data/p_gefs_{step}.grib2', engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                p_gefs_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'p_gefs_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
                 p_gefs_ds = p_gefs_ds.assign_coords(longitude=(((p_gefs_ds.longitude + 180) % 360) - 180)).sortby('longitude')
                 p_gefs_ds = dataset_processing.crop(p_gefs_ds, points_list)
                 p_gefs_ds = p_gefs_ds.interp(latitude=gefs_ds.latitude, longitude=gefs_ds.longitude)

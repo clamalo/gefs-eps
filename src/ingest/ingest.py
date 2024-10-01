@@ -5,6 +5,7 @@ import pandas as pd
 import aiofiles
 from tqdm.asyncio import tqdm as atqdm
 from io import StringIO
+import os
 
 async def fetch(session, url):
     async with session.get(url) as response:
@@ -104,15 +105,15 @@ async def ingest(date, cycle, step, gefs, eps):
     if eps:
         req_param = ["gh", "t"]
         req_level = ["1000 hPa", "925 hPa", "850 hPa", "700 hPa", "500 hPa"]
-        await download_data(date, cycle, step, req_param, req_level, f"data/ecmwf_{step}.grib2", mode='wb')
+        await download_data(date, cycle, step, req_param, req_level, os.path.join(os.getcwd(), 'data', f'ecmwf_{step}.grib2'), mode='wb')
 
         req_param = ["tp"]
-        await download_data(date, cycle, step, req_param, None, f"data/ecmwf_{step}.grib2", mode='ab')
+        await download_data(date, cycle, step, req_param, None, os.path.join(os.getcwd(), 'data', f'ecmwf_{step}.grib2'), mode='ab')
 
     if gefs:
         req_param = ["APCP"]
-        await download_gefs(date, cycle, step, req_param, None, f"data/gefs_{step}.grib2", mode='wb')
+        await download_gefs(date, cycle, step, req_param, None, os.path.join(os.getcwd(), 'data', f'gefs_{step}.grib2'), mode='wb')
 
         req_param = ["HGT", "TMP"]
         req_level = ["1000 mb", "925 mb", "850 mb", "700 mb", "500 mb"]
-        await download_gefs(date, cycle, step, req_param, req_level, f"data/p_gefs_{step}.grib2", mode='wb')
+        await download_gefs(date, cycle, step, req_param, req_level, os.path.join(os.getcwd(), 'data', f'p_gefs_{step}.grib2'), mode='wb')

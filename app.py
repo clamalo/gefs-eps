@@ -7,13 +7,14 @@ from datetime import datetime
 import signal
 import requests  # For elevation API
 from urllib.parse import unquote
+import sys
 
 app = Flask(__name__)
 app.secret_key = 'your_secure_secret_key'  # Replace with a secure key
 
 OUTPUT_DIR = os.path.join(os.getcwd(), 'output')
 MODEL_SCRIPT = 'run_model.py'  # Ensure this script exists
-PROGRESS_FILE = os.path.join(os.getcwd(), 'data/progress.json')
+PROGRESS_FILE = os.path.join(os.getcwd(), 'data', 'progress.json')
 
 # Global variable to track the model subprocess
 model_process = None
@@ -149,7 +150,7 @@ def index():
         try:
             # Start the subprocess and store the process handle
             model_process = subprocess.Popen([
-                'python', MODEL_SCRIPT,
+                sys.executable, MODEL_SCRIPT,  # This ensures the current Python interpreter is used
                 '--date', date,
                 '--cycle', cycle,
                 '--starting_step', str(starting_step),
@@ -158,6 +159,7 @@ def index():
                 '--eps', str(eps),
                 '--gefs', str(gefs)
             ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
             flash('Model is running. Check the <a href="{}">output visualization page</a> for results over the next few minutes as the model begins to run.'.format(url_for('outputs')), 'success')
         except Exception as e:
             flash(f'Error running model: {e}', 'error')

@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta, time
 import matplotlib.colors as mcolors
+import os
 
 def median_across_steps(list):
     return np.median(np.array(list), axis=1)
@@ -139,7 +140,7 @@ def plot_exceedance_probabilities(fig, row, point_data, x_values):
     
 
 def plot_points(gefs, eps):
-    with open('data/points_data_hourly.json', 'r') as f:
+    with open(os.path.join(os.getcwd(), 'data', 'points_data_hourly.json'), 'r') as f:
         points_data_dict = json.load(f)
 
     second_key = list(points_data_dict.keys())[1]
@@ -257,4 +258,4 @@ def plot_points(gefs, eps):
             title_text=f'{point} ({int(points_data_dict[point]["elevation"])}ft)'
         )
 
-        fig.write_html(f'output/{point}.html')
+        fig.write_html(os.path.join(os.getcwd(), 'output', f'{point}.html'))

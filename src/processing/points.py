@@ -63,16 +63,61 @@ def slr(point_t2ms):
         xarray.DataArray: Snow Liquid Ratio values.
     """
     
-    point_slrs = xr.where(
-    point_t2ms >= 32, 6,
-    xr.where(
-        point_t2ms >= 10, -0.8636 * point_t2ms + 33.636,
-        xr.where(
-            point_t2ms >= 0, 1.3 * point_t2ms + 12,
-            12
-        )
-    )
-    )
+    # point_slrs = xr.where(
+    # point_t2ms >= 32, 6,
+    # xr.where(
+    #     point_t2ms >= 10, -0.8636 * point_t2ms + 33.636,
+    #     xr.where(
+    #         point_t2ms >= 0, 1.3 * point_t2ms + 12,
+    #         12
+    #     )
+    # )
+    # )
+
+    point_slrs = xr.where(point_t2ms > 35.0, 0,
+
+                xr.where(point_t2ms >= 28.4,
+                    8 + (point_t2ms - 32.0) * (10 - 8) / (28.4 - 32.0),
+
+                xr.where(point_t2ms >= 24.8,
+                    10 + (point_t2ms - 28.4) * (11 - 10) / (24.8 - 28.4),
+
+                xr.where(point_t2ms >= 21.2,
+                    11 + (point_t2ms - 24.8) * (12 - 11) / (21.2 - 24.8),
+
+                xr.where(point_t2ms >= 17.6,
+                    12 + (point_t2ms - 21.2) * (13 - 12) / (17.6 - 21.2),
+
+                xr.where(point_t2ms >= 14.0,
+                    13 + (point_t2ms - 17.6) * (15 - 13) / (14.0 - 17.6),
+
+                xr.where(point_t2ms >= 10.4,
+                    15 + (point_t2ms - 14.0) * (20 - 15) / (10.4 - 14.0),
+
+                xr.where(point_t2ms >= 6.8,
+                    20 + (point_t2ms - 10.4) * (25 - 20) / (6.8 - 10.4),
+
+                xr.where(point_t2ms >= 3.2,
+                    25 + (point_t2ms - 6.8) * (28 - 25) / (3.2 - 6.8),
+
+                xr.where(point_t2ms >= -0.4,
+                    28 + (point_t2ms - 3.2) * (25 - 28) / (-0.4 - 3.2),
+
+                xr.where(point_t2ms >= -4.0,
+                    25 + (point_t2ms - (-0.4)) * (20 - 25) / (-4.0 - (-0.4)),
+
+                xr.where(point_t2ms >= -7.6,
+                    20 + (point_t2ms - (-4.0)) * (15 - 20) / (-7.6 - (-4.0)),
+
+                xr.where(point_t2ms >= -11.2,
+                    15 + (point_t2ms - (-7.6)) * (12 - 15) / (-11.2 - (-7.6)),
+
+                xr.where(point_t2ms >= -14.8,
+                    12 + (point_t2ms - (-11.2)) * (10 - 12) / (-14.8 - (-11.2)),
+
+                    10  # For point_t2ms < -14.8
+                ))))))))))))))
+
     return point_slrs
 
 def find_zero_c_elevation(ghs, point_t2ms, point_elevation):

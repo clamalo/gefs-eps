@@ -1,0 +1,234 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Super Ensemble Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- Google Fonts for modern typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet"> 
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>GEFS + EPS Super Ensemble Dashboard</h1>
+
+        <!-- Navigation Buttons -->
+        <div class="nav-buttons">
+            <a href="{{ url_for('map_page') }}" class="nav-button">Manage Points on Map</a>
+            <a href="{{ url_for('outputs') }}" class="nav-button">View Output Results</a>
+        </div>
+        
+        <!-- Notification Area -->
+        <div id="notification"></div>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert {{ category }}">{{ message|safe }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <!-- Progress Bar -->
+        <div class="progress-container" id="progress-container" style="display: none;">
+            <label for="progress">Model Progress:</label>
+            <div class="progress-bar" id="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <span id="progress-text">0% [0/0]</span>
+            <span id="time-estimation" class="time-estimation">Estimated Time Remaining: 00:00:00</span>
+            <button id="stop-button" class="stop-button" onclick="stopModel()">STOP</button>
+        </div>
+
+        <form method="POST">
+            <label for="date">Date (YYYYMMDD):</label>
+            <input type="text" id="date" name="date" placeholder="YYYYMMDD">
+
+            <label for="cycle">Cycle:</label>
+            <input type="text" id="cycle" name="cycle" placeholder="00">
+
+            <label for="starting_step">Starting Step:</label>
+            <input type="text" id="starting_step" name="starting_step" placeholder="3">
+
+            <label for="ending_step">Ending Step:</label>
+            <input type="text" id="ending_step" name="ending_step" placeholder="145">
+
+            <label for="delta_t">Delta_t:</label>
+            <input type="text" id="delta_t" name="delta_t" placeholder="3">
+
+            <label for="EPS">EPS:</label>
+            <select id="EPS" name="EPS" required>
+                <option value="True">True</option>
+                <option value="False" selected>False</option>
+            </select>
+
+            <label for="GEFS">GEFS:</label>
+            <select id="GEFS" name="GEFS" required>
+                <option value="True" selected>True</option>
+                <option value="False">False</option>
+            </select>
+
+            <button type="submit">RUN</button>
+        </form>
+    </div>
+
+    <script>
+        let remaining_seconds = 0;
+        let countdown_timer;
+
+        function showNotification(message, type='success') {
+            var notification = $('#notification');
+            notification.removeClass();
+            notification.addClass(`notification ${type}`);
+            notification.text(message);
+            notification.addClass('show');
+            setTimeout(function(){
+                notification.removeClass('show');
+            }, 5000);
+        }
+
+        function updateProgress() {
+            $.ajax({
+                url: "{{ url_for('progress') }}",
+                method: 'GET',
+                success: function(data) {
+                    var progress = data.percentage;
+                    var current = data.current;
+                    var total = data.total;
+                    var estimated_time = data.estimated_time_remaining;
+
+                    $('#progress-fill').css('width', progress + '%');
+                    $('#progress-text').text(progress + '% [' + current + '/' + total + ']');
+                    $('#time-estimation').text('Estimated Time Remaining: ' + estimated_time);
+
+                    if(progress < 100){
+                        $('#progress-fill').addClass('animating').removeClass('completed');
+                    } else {
+                        $('#progress-fill').removeClass('animating').addClass('completed');
+                        clearInterval(countdown_timer);
+                    }
+
+                    // Update the countdown
+                    remaining_seconds = timeStringToSeconds(estimated_time);
+                },
+                error: function() {
+                    console.log('Error fetching progress');
+                }
+            });
+        }
+
+        function checkStatus() {
+            $.ajax({
+                url: "{{ url_for('status') }}",
+                method: 'GET',
+                success: function(data) {
+                    if(data.is_running){
+                        $('#progress-container').show();
+                        updateProgress();
+                        startCountdown();
+                        $('#stop-button').show();
+                    } else {
+                        $('#progress-container').hide();
+                        $('#progress-fill').css('width', '0%').removeClass('animating completed');
+                        $('#progress-text').text('0% [0/0]');
+                        $('#time-estimation').text('Estimated Time Remaining: 00:00:00');
+                        $('#stop-button').hide();
+                        clearInterval(countdown_timer);
+                    }
+                },
+                error: function() {
+                    console.log('Error fetching status');
+                }
+            });
+        }
+
+        function stopModel() {
+            $.ajax({
+                url: "{{ url_for('stop') }}",
+                method: 'POST',
+                success: function(response) {
+                    showNotification('Model run has been stopped.', 'success');
+                    location.reload();
+                },
+                error: function() {
+                    showNotification('Error stopping the model.', 'error');
+                }
+            });
+        }
+
+        function timeStringToSeconds(time_str) {
+            var parts = time_str.split(':');
+            var seconds = 0;
+            if(parts.length === 3){
+                seconds += parseInt(parts[0]) * 3600;
+                seconds += parseInt(parts[1]) * 60;
+                seconds += parseInt(parts[2]);
+            }
+            return seconds;
+        }
+
+        function startCountdown() {
+            clearInterval(countdown_timer);
+            countdown_timer = setInterval(function(){
+                if(remaining_seconds > 0){
+                    remaining_seconds--;
+                    var formatted_time = secondsToTime(remaining_seconds);
+                    $('#time-estimation').text('Estimated Time Remaining: ' + formatted_time);
+                } else {
+                    clearInterval(countdown_timer);
+                }
+            }, 1000);
+        }
+
+        function secondsToTime(secs) {
+            var hours = Math.floor(secs / 3600);
+            var minutes = Math.floor((secs % 3600) / 60);
+            var seconds = secs % 60;
+            return String(hours).padStart(2, '0') + ':' + 
+                   String(minutes).padStart(2, '0') + ':' + 
+                   String(seconds).padStart(2, '0');
+        }
+
+        $(document).ready(function() {
+            // Set default date to current local date
+            var today = new Date();
+            var yyyy = today.getFullYear();
+            var mm = String(today.getMonth() + 1).padStart(2, '0'); // Months start at 0!
+            var dd = String(today.getDate()).padStart(2, '0');
+            var formattedDate = yyyy + mm + dd;
+            $('#date').attr('placeholder', formattedDate);
+            if ($('#date').val() === "") {
+                $('#date').val(formattedDate);
+                $('#date').addClass('default');
+            }
+
+            $('#date').on('input', function() {
+                if ($(this).hasClass('default')) {
+                    $(this).removeClass('default');
+                }
+            });
+
+            // Check model status on page load
+            checkStatus();
+
+            // Periodically check status every 5 seconds
+            setInterval(checkStatus, 5000);
+
+            // If model is running, also update progress every 5 seconds
+            setInterval(function(){
+                $.ajax({
+                    url: "{{ url_for('status') }}",
+                    method: 'GET',
+                    success: function(data) {
+                        if(data.is_running){
+                            updateProgress();
+                        }
+                    }
+                });
+            }, 5000);
+        });
+    </script>
+</body>
+</html>

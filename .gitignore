@@ -1,0 +1,5 @@
+.DS_Store
+data/
+output/
+points_data.json
+points_data_hourly.json

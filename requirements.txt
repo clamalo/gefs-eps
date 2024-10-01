@@ -1,0 +1,13 @@
+Flask
+requests
+xarray
+aiohttp
+pandas
+aiofiles
+tqdm
+numpy
+plotly
+matplotlib
+timezonefinder
+pytz
+scipy

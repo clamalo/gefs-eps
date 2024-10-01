@@ -1,0 +1,225 @@
+<!-- templates/map.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Point Map</title>
+    <meta charset="utf-8" />
+    <!-- Include Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <!-- Include custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- Include Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- Include jQuery (for AJAX) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        /* Map container height must be set */
+        #map {
+            width: 100%;
+            height: 600px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .leaflet-popup-content {
+            font-size: 14px;
+            font-family: 'Roboto', sans-serif;
+            /* Increased width */
+            width: 250px;
+        }
+        .leaflet-popup-content-wrapper {
+            width: 260px !important; /* Adjusted to accommodate the increased content width */
+        }
+        .popup-input {
+            width: 100%;
+            padding: 5px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .popup-button {
+            margin-top: 10px;
+            padding: 6px 12px;
+            background-color: #28a745;
+            color: #ffffff;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            border-radius: 4px;
+            transition: background-color 0.3s ease;
+        }
+        .popup-button.delete {
+            background-color: #dc3545;
+        }
+        .popup-button:hover {
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button onclick="goBack()" class="back-button">Back to Home</button>
+        <h1>Point Map</h1>
+        <div id="map"></div>
+        <!-- Notification Area -->
+        <div id="notification"></div>
+    </div>
+    <script>
+        function goBack() {
+            window.location.href = "{{ url_for('index') }}";
+        }
+
+        function showNotification(message, type='success') {
+            var notification = $('#notification');
+            notification.removeClass();
+            notification.addClass(`notification ${type}`);
+            notification.text(message);
+            notification.addClass('show');
+            setTimeout(function(){
+                notification.removeClass('show');
+            }, 5000);
+        }
+
+        // Initialize the map with adjusted zoom options for larger steps
+        var map = L.map('map', {
+            smoothZoom: true,
+            smoothWheelZoom: true,
+            zoomSnap: 1,    // Increased zoom step to 1
+            zoomDelta: 1    // Increased zoom delta to 1
+        }).setView([39.8283, -98.5795], 4); // Centered on the USA
+
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: 'Map data © OpenStreetMap contributors',
+            maxZoom: 18,
+        }).addTo(map);
+
+        // Load points from server
+        $.getJSON("{{ url_for('get_points') }}", function(points) {
+            points.forEach(function(point) {
+                var marker = L.marker([point.lat, point.lon]).addTo(map);
+                marker.bindPopup(`
+                    <b>${point.name}</b><br>
+                    Latitude: ${point.lat.toFixed(6)}<br>
+                    Longitude: ${point.lon.toFixed(6)}<br>
+                    Elevation: ${point.elevation} feet<br>
+                    <button class="popup-button delete" onclick="deletePoint('${point.name}')">Delete Point</button>
+                `);
+            });
+        });
+
+        // Handle map click for adding new point
+        map.on('click', function(e) {
+            var lat = e.latlng.lat;
+            var lon = e.latlng.lng;
+
+            // Fetch elevation from Open-Elevation API
+            $.ajax({
+                url: `https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`,
+                method: 'GET',
+                success: function(response) {
+                    var elevationMeters = response.results[0].elevation;
+                    var elevationFeet = (elevationMeters * 3.28084).toFixed(2);
+
+                    var popupContent = `
+                        <b>Add New Point</b><br>
+                        Latitude: ${lat.toFixed(6)}<br>
+                        Longitude: ${lon.toFixed(6)}<br>
+                        Elevation: ${elevationFeet} feet<br>
+                        <input type="text" id="point-name" class="popup-input" placeholder="Enter Point Name"><br>
+                        <button class="popup-button" onclick="savePoint(${lat}, ${lon}, ${elevationFeet})">Save Point</button>
+                    `;
+                    var popup = L.popup()
+                        .setLatLng(e.latlng)
+                        .setContent(popupContent)
+                        .openOn(map);
+                },
+                error: function() {
+                    var popupContent = `
+                        <b>Add New Point</b><br>
+                        Latitude: ${lat.toFixed(6)}<br>
+                        Longitude: ${lon.toFixed(6)}<br>
+                        Elevation: Unable to fetch<br>
+                        <input type="text" id="point-name" class="popup-input" placeholder="Enter Point Name"><br>
+                        <input type="text" id="point-elevation" class="popup-input" placeholder="Enter Elevation (feet, optional)"><br>
+                        <button class="popup-button" onclick="savePoint(${lat}, ${lon})">Save Point</button>
+                    `;
+                    var popup = L.popup()
+                        .setLatLng(e.latlng)
+                        .setContent(popupContent)
+                        .openOn(map);
+                    showNotification('Failed to fetch elevation data.', 'error');
+                }
+            });
+        });
+
+        function savePoint(lat, lon, elevation = null) {
+            var name = document.getElementById('point-name').value.trim();
+            var elevationInput = elevation !== null ? elevation : document.getElementById('point-elevation').value.trim();
+
+            if (!name) {
+                showNotification('Please enter a point name.', 'error');
+                return;
+            }
+
+            // Close the popup
+            map.closePopup();
+
+            // Prepare data
+            var data = {
+                name: name,
+                lat: lat,
+                lon: lon
+            };
+            if (elevationInput !== "" && elevation !== null) {
+                data.elevation = parseFloat(elevationInput);
+                if (isNaN(data.elevation)) {
+                    showNotification('Invalid elevation value.', 'error');
+                    return;
+                }
+            }
+
+            // Send data to server
+            $.ajax({
+                url: "{{ url_for('add_point') }}",
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                success: function(response) {
+                    showNotification('Point added successfully.', 'success');
+                    // Refresh the map markers after a short delay to allow file update
+                    setTimeout(function(){
+                        location.reload();
+                    }, 1000);
+                },
+                error: function(xhr, status, error) {
+                    var errorMessage = xhr.responseJSON ? xhr.responseJSON.message : 'Unknown error';
+                    showNotification('Error adding point: ' + errorMessage, 'error');
+                }
+            });
+        }
+
+        function deletePoint(name) {
+            // Send data to server
+            $.ajax({
+                url: "{{ url_for('delete_point') }}",
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    name: name
+                }),
+                success: function(response) {
+                    showNotification('Point deleted successfully.', 'success');
+                    // Refresh the map markers after a short delay to allow file update
+                    setTimeout(function(){
+                        location.reload();
+                    }, 1000);
+                },
+                error: function(xhr, status, error) {
+                    var errorMessage = xhr.responseJSON ? xhr.responseJSON.message : 'Unknown error';
+                    showNotification('Error deleting point: ' + errorMessage, 'error');
+                }
+            });
+        }
+    </script>
+</body>
+</html>

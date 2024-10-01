@@ -1,0 +1,42 @@
+<!-- templates/output_viewer.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Output Viewer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- Google Fonts for modern typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet"> 
+</head>
+<body>
+    <div class="container">
+        <button onclick="goBack()" class="back-button">Back to Home</button>
+        <h1>Output Viewer</h1>
+        <label for="points">Select a Point:</label>
+        <select id="points" name="points" onchange="viewPoint(this.value)">
+            <option value="">--Select a Point--</option>
+            {% for point in points %}
+                <option value="{{ point }}">{{ point }}</option>
+            {% endfor %}
+        </select>
+
+        <iframe id="outputFrame" style="width:100%; height:600px; margin-top:10px;"></iframe> <!-- Reduced margin-top from 20px to 10px -->
+    </div>
+
+    <script>
+        function viewPoint(point) {
+            if (point) {
+                var encodedPoint = encodeURIComponent(point);
+                document.getElementById('outputFrame').src = '/view/' + encodedPoint;
+            } else {
+                document.getElementById('outputFrame').src = '';
+            }
+        }
+
+        function goBack() {
+            window.location.href = "{{ url_for('index') }}";
+        }
+    </script>
+</body>
+</html>

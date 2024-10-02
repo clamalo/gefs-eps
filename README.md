@@ -35,7 +35,7 @@ This tool provides a web-based interface to run a super ensemble snowfall predic
 
 1.) **Python**
 
-See the [Python website](https://www.python.org/downloads/) for Python installation help.
+See the [Python website](https://www.python.org/downloads/) for Python installation help. Downloading the most recent version of Python for your specific operating system is best.
 
 2. **Open the terminal application on your computer**
 

@@ -35,7 +35,7 @@ This tool provides a web-based interface to run a super ensemble snowfall predic
 
 1.) **Python**
 
-    You can install Python either via Python itself or through conda. See the [Python website](https://www.python.org/downloads/) for Python installation help, or the [Miniconda website](https://docs.anaconda.com/miniconda/) for conda.
+You can install Python either via Python itself or through conda. See the [Python website](https://www.python.org/downloads/) for Python installation help, or the [Miniconda website](https://docs.anaconda.com/miniconda/) for conda.
 
 
 2. **Open the terminal application on your computer**

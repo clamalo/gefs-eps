@@ -35,8 +35,7 @@ This tool provides a web-based interface to run a super ensemble snowfall predic
 
 1.) **Python**
 
-You can install Python either via Python itself or through conda. See the [Python website](https://www.python.org/downloads/) for Python installation help (recommended), or the [Miniconda website](https://docs.anaconda.com/miniconda/) for conda.
-
+See the [Python website](https://www.python.org/downloads/) for Python installation help.
 
 2. **Open the terminal application on your computer**
 
@@ -46,15 +45,13 @@ You can install Python either via Python itself or through conda. See the [Pytho
    git clone https://github.com/clamalo/gefs-eps.git
    cd gefs-eps
    ```
-
+   
 4. **Install the required packages**
 
    ```bash
    pip install -r requirements.txt
    ```
-
-   Note: if you're using conda, you'll need to run ```conda install pip``` before installing the packages in the `requirements.txt` file
-
+   
 ## Usage
 
 ### Starting the Application

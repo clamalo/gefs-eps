@@ -33,23 +33,25 @@ This tool provides a web-based interface to run a super ensemble snowfall predic
 
 ## Installation
 
-1. **Open the terminal application on your computer**
+1.) **Python**
 
-2. **Clone the repository**
+See the [Python website](https://www.python.org/downloads/) for Python installation help.
+
+2. **Open the terminal application on your computer**
+
+3. **Clone the repository**
 
    ```bash
    git clone https://github.com/clamalo/gefs-eps.git
    cd gefs-eps
    ```
-
-3. **Install the required packages**
+   
+4. **Install the required packages**
 
    ```bash
    pip install -r requirements.txt
    ```
-
-   Make sure you have a `requirements.txt` file in the project directory with all the necessary dependencies listed.
-
+   
 ## Usage
 
 ### Starting the Application

@@ -1,4 +1,3 @@
-<!-- templates/map.html -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -6,12 +5,16 @@
     <meta charset="utf-8" />
     <!-- Include Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <!-- Include Leaflet Control Geocoder CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
     <!-- Include custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <!-- Include Leaflet JavaScript -->
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <!-- Include jQuery (for AJAX) -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Include Leaflet Control Geocoder JS -->
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
     <style>
         /* Map container height must be set */
         #map {
@@ -23,11 +26,10 @@
         .leaflet-popup-content {
             font-size: 14px;
             font-family: 'Roboto', sans-serif;
-            /* Increased width */
             width: 250px;
         }
         .leaflet-popup-content-wrapper {
-            width: 260px !important; /* Adjusted to accommodate the increased content width */
+            width: 260px !important;
         }
         .popup-input {
             width: 100%;
@@ -53,6 +55,95 @@
         .popup-button:hover {
             opacity: 0.8;
         }
+        /* Notification styling */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 5px;
+            color: #fff;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            z-index: 1000;
+        }
+        .notification.show {
+            opacity: 1;
+        }
+        .notification.success {
+            background-color: #28a745;
+        }
+        .notification.error {
+            background-color: #dc3545;
+        }
+        
+        /* Improved Search Bar Styling */
+        .leaflet-control-geocoder {
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .leaflet-control-geocoder-form {
+            display: flex;
+            align-items: center;
+            height: 36px; /* Set a fixed height for the search control */
+        }
+        .leaflet-control-geocoder-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            background-color: #007bff;
+            color: #fff;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .leaflet-control-geocoder-icon:hover {
+            background-color: #0056b3;
+        }
+        .leaflet-control-geocoder input {
+            display: none; /* Hide the input field when not active */
+            flex: 1;
+            padding: 8px 10px;
+            font-size: 14px;
+            border: none;
+            outline: none;
+        }
+        .leaflet-control-geocoder.leaflet-control-geocoder-expanded input {
+            display: block; /* Show input field when expanded */
+        }
+        /* Adjust positioning of the search bar */
+        .leaflet-top.leaflet-right {
+            top: 10px;
+            right: 10px;
+        }
+
+        /* Back button styling */
+        .back-button {
+            margin: 10px;
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: #ffffff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .back-button:hover {
+            background-color: #0056b3;
+        }
+        /* Container styling */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        h1 {
+            margin-bottom: 20px;
+            font-family: 'Roboto', sans-serif;
+        }
     </style>
 </head>
 <body>
@@ -61,7 +152,7 @@
         <h1>Point Map</h1>
         <div id="map"></div>
         <!-- Notification Area -->
-        <div id="notification"></div>
+        <div id="notification" class="notification"></div>
     </div>
     <script>
         function goBack() {
@@ -87,11 +178,41 @@
             zoomDelta: 1    // Increased zoom delta to 1
         }).setView([39.8283, -98.5795], 4); // Centered on the USA
 
-        // Add OpenStreetMap tile layer
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: 'Map data © OpenStreetMap contributors',
-            maxZoom: 18,
+        // Add OpenTopoMap tile layer
+        L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            attribution: 'Map data © OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap (CC-BY-SA)',
+            maxZoom: 17,
         }).addTo(map);
+
+        // Variable to store the current polygon
+        var currentPolygon = null;
+
+        // Add a search bar using Leaflet Control Geocoder
+        var geocoder = L.Control.geocoder({
+            defaultMarkGeocode: false,
+            placeholder: "Search for a location...",
+            errorMessage: "Nothing found."
+        })
+        .on('markgeocode', function(e) {
+            // Remove existing polygon if any
+            if (currentPolygon) {
+                map.removeLayer(currentPolygon);
+            }
+
+            var bbox = e.geocode.bbox;
+            currentPolygon = L.polygon([
+                [bbox.getSouthWest().lat, bbox.getSouthWest().lng],
+                [bbox.getNorthWest().lat, bbox.getNorthWest().lng],
+                [bbox.getNorthEast().lat, bbox.getNorthEast().lng],
+                [bbox.getSouthEast().lat, bbox.getSouthEast().lng]
+            ], {
+                color: '#3388ff',
+                fillColor: '#3388ff',
+                fillOpacity: 0.2
+            }).addTo(map);
+            map.fitBounds(currentPolygon.getBounds());
+        })
+        .addTo(map);
 
         // Load points from server
         $.getJSON("{{ url_for('get_points') }}", function(points) {

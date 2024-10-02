@@ -8,7 +8,7 @@ import math
 import json
 import signal
 import sys
-from datetime import timedelta
+from datetime import timedelta, datetime  # Added datetime for time calculations
 import src.ingest.ingest as ingest
 import src.processing.dataset as dataset_processing
 import src.processing.points as points_processing
@@ -33,6 +33,9 @@ def update_progress(current_step_num, total_steps, delta_t, step_durations, star
     current_hours = current_step_num * delta_t
     total_hours = total_steps * delta_t
 
+    # Get current time
+    current_time = datetime.now()  # Get the current time
+
     # Calculate average duration per hour based on all steps except the first one
     if current_step_num == 1 and len(step_durations) >= 1:
         average_time_per_hour = step_durations[0]
@@ -46,17 +49,24 @@ def update_progress(current_step_num, total_steps, delta_t, step_durations, star
     # Estimate remaining time
     estimated_remaining_seconds = average_time_per_hour * (remaining_hours/delta_t)
 
-    # Format as HH:MM:SS
+    # Calculate predicted finish time
+    predicted_finish_time = current_time + timedelta(seconds=int(estimated_remaining_seconds))
+
+    # Convert predicted_finish_time to an ISO formatted string
+    predicted_finish_time_str = predicted_finish_time.isoformat()
+
+    # Format as HH:MM:SS (keeping for compatibility)
     estimated_time_remaining = str(timedelta(seconds=int(estimated_remaining_seconds)))
 
-    percentage = math.floor((current_hours / total_hours) * 100) if total_hours > 0 else 100
+    percentage = math.floor((current_hours / total_hours) * 100) if total_steps > 0 else 100
     percentage = max(0, min(percentage, 100))  # Ensure progress is between 0 and 100
 
     progress_data = {
         "percentage": percentage,
         "current": current_hours,
         "total": total_hours,
-        "estimated_time_remaining": estimated_time_remaining
+        "estimated_time_remaining": estimated_time_remaining,
+        "predicted_finish_time": predicted_finish_time_str  # Added predicted_finish_time to progress data
     }
     try:
         with open(PROGRESS_FILE, 'w') as f:

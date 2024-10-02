@@ -26,7 +26,8 @@ def initialize_progress():
         "percentage": 0,
         "current": 0,
         "total": 0,
-        "estimated_time_remaining": "00:00:00"
+        "estimated_time_remaining": "00:00:00",
+        "predicted_finish_time": None  # Added predicted_finish_time initialization
     }
     try:
         # create data directory if it doesn't exist
@@ -138,7 +139,8 @@ def index():
                 "percentage": 0,
                 "current": 0,
                 "total": total_hours,
-                "estimated_time_remaining": "00:00:00"
+                "estimated_time_remaining": "00:00:00",
+                "predicted_finish_time": None  # Added predicted_finish_time reset
             }
             with open(PROGRESS_FILE, 'w') as f:
                 json.dump(progress_data, f)
@@ -179,21 +181,25 @@ def progress():
                 current = progress.get('current', 0)
                 total = progress.get('total', 0)
                 estimated_time_remaining = progress.get('estimated_time_remaining', "00:00:00")
+                predicted_finish_time = progress.get('predicted_finish_time', None)  # Retrieve predicted_finish_time
         except:
             percentage = 0
             current = 0
             total = 0
             estimated_time_remaining = "00:00:00"
+            predicted_finish_time = None
     else:
         percentage = 0
         current = 0
         total = 0
         estimated_time_remaining = "00:00:00"
+        predicted_finish_time = None
     return jsonify({
         'percentage': percentage, 
         'current': current, 
         'total': total,
-        'estimated_time_remaining': estimated_time_remaining
+        'estimated_time_remaining': estimated_time_remaining,
+        'predicted_finish_time': predicted_finish_time  # Include predicted_finish_time in the response
     })
 
 @app.route('/status')
@@ -230,7 +236,8 @@ def stop():
             "percentage": 0,
             "current": 0,
             "total": 0,
-            "estimated_time_remaining": "00:00:00"
+            "estimated_time_remaining": "00:00:00",
+            "predicted_finish_time": None  # Added predicted_finish_time reset
         }
         with open(PROGRESS_FILE, 'w') as f:
             json.dump(progress_data, f)

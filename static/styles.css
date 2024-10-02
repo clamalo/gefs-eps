@@ -199,8 +199,9 @@ a:hover {
 
 .progress-bar {
     width: 100%;
-    background-color: #e9ecef;
+    background-color: #e0e0e0;
     border-radius: 25px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     overflow: hidden;
     height: 20px;
     margin-top: 10px;
@@ -208,9 +209,9 @@ a:hover {
 
 .progress-fill {
     height: 100%;
-    background-color: #28a745;
     width: 0%;
-    transition: width 0.5s ease-in-out, background-color 0.5s ease-in-out;
+    background: linear-gradient(90deg, #6a11cb 0%, #2575fc 100%);
+    transition: width 0.4s ease-in-out;
     border-radius: 25px 0 0 25px;
 }
 
@@ -241,9 +242,14 @@ a:hover {
 }
 
 .progress-fill.animating {
-    background: linear-gradient(90deg, #28a745 25%, #a8e6cf 50%, #28a745 75%);
-    background-size: 200px 100%;
-    animation: loadingAnimation 1.5s linear infinite;
+    background: linear-gradient(90deg, rgba(106,17,203,1) 0%, rgba(37,117,252,1) 50%, rgba(106,17,203,1) 100%);
+    background-size: 200% 100%;
+    animation: moveGradient 1.5s ease infinite;
+}
+
+@keyframes moveGradient {
+    0% { background-position: 0 0; }
+    100% { background-position: 200% 0; }
 }
 
 .progress-fill.completed {

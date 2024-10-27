@@ -150,7 +150,7 @@ def index():
 
         # Run the model in a separate subprocess
         try:
-            # Start the subprocess and store the process handle
+            # Start the subprocess without capturing stdout/stderr
             model_process = subprocess.Popen([
                 sys.executable, MODEL_SCRIPT,  # This ensures the current Python interpreter is used
                 '--date', date,
@@ -160,8 +160,7 @@ def index():
                 '--delta_t', str(delta_t),
                 '--eps', str(eps),
                 '--gefs', str(gefs)
-            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
+            ])
             flash('Model is running. Check the <a href="{}">output visualization page</a> for results over the next few minutes as the model begins to run.'.format(url_for('outputs')), 'success')
         except Exception as e:
             flash(f'Error running model: {e}', 'error')

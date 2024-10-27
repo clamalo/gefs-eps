@@ -225,7 +225,7 @@ async def ingest(date, cycle, step, gefs, eps):
     # Determine initial semaphore limit based on CPU cores
     cpu_cores = multiprocessing.cpu_count()
     initial_limit = max(cpu_cores * 5, 10)  # Start with 2x CPU cores or at least 10
-    max_limit = cpu_cores * 25  # Define a maximum limit to prevent overloading
+    max_limit = cpu_cores * 10  # Define a maximum limit to prevent overloading
     semaphore_manager = AdaptiveSemaphore(initial_limit=initial_limit, max_limit=max_limit)
 
     logging.info(f"Initialized semaphore with limit: {semaphore_manager.current_limit()}")

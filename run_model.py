@@ -201,41 +201,41 @@ def main(args):
                 print(f"Error during interpolation or plotting for step {step}: {e}")
                 continue
 
-    # After processing, generate HTML files for each point
-    for point in points_list:
-        if terminate:
-            print("Termination flag set. Skipping HTML generation.")
-            break
-        name = point[0]
-        # Implement HTML generation logic here
-        # For example:
-        html_content = f"""
-        <html>
-            <head>
-                <title>{name} Snowfall Forecast</title>
-                <style>
-                    body {{
-                        font-family: 'Roboto', sans-serif;
-                        padding: 20px;
-                        background-color: #f0f2f5;
-                    }}
-                    h1 {{
-                        color: #333333;
-                        text-align: center;
-                    }}
-                </style>
-            </head>
-            <body>
-                <h1>Data for {name}</h1>
-                <!-- Add detailed data visualization here -->
-            </body>
-        </html>
-        """
-        try:
-            with open(os.path.join('output', f"{name}.html"), 'w') as f:
-                f.write(html_content)
-        except Exception as e:
-            print(f"Error writing HTML for point {name}: {e}")
+    # # After processing, generate HTML files for each point
+    # for point in points_list:
+    #     if terminate:
+    #         print("Termination flag set. Skipping HTML generation.")
+    #         break
+    #     name = point[0]
+    #     # Implement HTML generation logic here
+    #     # For example:
+    #     html_content = f"""
+    #     <html>
+    #         <head>
+    #             <title>{name} Snowfall Forecast</title>
+    #             <style>
+    #                 body {{
+    #                     font-family: 'Roboto', sans-serif;
+    #                     padding: 20px;
+    #                     background-color: #f0f2f5;
+    #                 }}
+    #                 h1 {{
+    #                     color: #333333;
+    #                     text-align: center;
+    #                 }}
+    #             </style>
+    #         </head>
+    #         <body>
+    #             <h1>Data for {name}</h1>
+    #             <!-- Add detailed data visualization here -->
+    #         </body>
+    #     </html>
+    #     """
+    #     try:
+    #         with open(os.path.join('output', f"{name}.html"), 'w') as f:
+    #             f.write(html_content)
+    #     except Exception as e:
+    #         print(f"Error writing HTML for point {name}: {e}")
 
     if not terminate:
         # Set progress to 100% upon completion

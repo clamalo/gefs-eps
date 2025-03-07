@@ -1,6 +1,6 @@
 <!-- templates/output_viewer.html -->
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <title>Output Viewer</title>
@@ -8,9 +8,34 @@
     <!-- Google Fonts for modern typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet"> 
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        .time-selectors {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+        }
+        
+        .time-selector {
+            flex: 1;
+            margin: 0 5px;
+        }
+        
+        .time-label {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
+        <button id="theme-toggle" class="theme-toggle" title="Toggle dark/light mode">
+            <i class="fas fa-moon"></i>
+        </button>
+        
         <button onclick="goBack()" class="back-button">Back to Home</button>
         <h1>Output Viewer</h1>
         <label for="points">Select a Point:</label>
@@ -21,22 +46,247 @@
             {% endfor %}
         </select>
 
-        <iframe id="outputFrame" style="width:100%; height:600px; margin-top:10px;"></iframe> <!-- Reduced margin-top from 20px to 10px -->
+        <!-- Time range selectors -->
+        <div class="time-selectors" id="time-selectors" style="display: none;">
+            <div class="time-selector">
+                <label for="start-time" class="time-label">Start Time:</label>
+                <select id="start-time" name="start-time" onchange="updateTimeRange()">
+                    <option value="">--Select Start Time--</option>
+                </select>
+            </div>
+            
+            <div class="time-selector">
+                <label for="end-time" class="time-label">End Time:</label>
+                <select id="end-time" name="end-time" onchange="updateTimeRange()">
+                    <option value="">--Select End Time--</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Container for rendering plot directly; using flex to center the content -->
+        <div id="plot-container" style="display: flex; flex-direction: column; align-items: center; width:100%; margin-top:10px;"></div>
     </div>
 
     <script>
+        let availableTimes = [];
+        let originalPlotContent = '';
+        let currentPoint = '';
+        
         function viewPoint(point) {
             if (point) {
+                currentPoint = point;
                 var encodedPoint = encodeURIComponent(point);
-                document.getElementById('outputFrame').src = '/view/' + encodedPoint;
+                
+                // First, fetch the plot
+                $.ajax({
+                    url: '/view/' + encodedPoint,
+                    method: 'GET',
+                    success: function(data) {
+                        // Store the original plot content
+                        originalPlotContent = data;
+                        
+                        // Insert the content
+                        $('#plot-container').html(data);
+                        
+                        // Use a series of delayed attempts to render charts
+                        // with increasing delays to ensure initialization completes
+                        setTimeout(forceChartRendering, 50);
+                        setTimeout(forceChartRendering, 200);
+                        setTimeout(forceChartRendering, 500);
+                        
+                        // Then fetch available times for this point
+                        fetchAvailableTimes(point);
+                    },
+                    error: function() {
+                        $('#plot-container').html('<p>Error loading plot for ' + point + '</p>');
+                        $('#time-selectors').hide();
+                    }
+                });
             } else {
-                document.getElementById('outputFrame').src = '';
+                $('#plot-container').empty();
+                $('#time-selectors').hide();
+                currentPoint = '';
             }
+        }
+        
+        // Comprehensive function to force chart rendering
+        function forceChartRendering() {
+            // Trigger window resize (helps many charting libraries)
+            if (window.dispatchEvent) {
+                window.dispatchEvent(new Event('resize'));
+            }
+            
+            // Handle common charting libraries
+            
+            // Plotly
+            if (window.Plotly) {
+                const plotlyElements = document.querySelectorAll('[data-plotly]');
+                plotlyElements.forEach(function(element) {
+                    if (element && element.layout) {
+                        Plotly.relayout(element, element.layout);
+                    }
+                });
+            }
+            
+            // Chart.js
+            if (window.Chart) {
+                const chartElements = document.querySelectorAll('canvas.chart-js');
+                chartElements.forEach(function(canvas) {
+                    if (canvas.chart) {
+                        canvas.chart.update();
+                    }
+                });
+            }
+            
+            // For any embedded iframes that might contain charts
+            const iframes = document.querySelectorAll('#plot-container iframe');
+            iframes.forEach(function(iframe) {
+                // Force iframe refresh
+                const src = iframe.src;
+                iframe.src = '';
+                setTimeout(function() { iframe.src = src; }, 10);
+            });
+            
+            // Re-execute any script tags that might be in the content
+            const scripts = document.querySelectorAll('#plot-container script');
+            scripts.forEach(function(oldScript) {
+                const newScript = document.createElement('script');
+                Array.from(oldScript.attributes).forEach(attr => {
+                    newScript.setAttribute(attr.name, attr.value);
+                });
+                newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+                oldScript.parentNode.replaceChild(newScript, oldScript);
+            });
+        }
+        
+        function fetchAvailableTimes(point) {
+            $.ajax({
+                url: '/get_times/' + encodeURIComponent(point),
+                method: 'GET',
+                success: function(data) {
+                    availableTimes = data.times;
+                    populateTimeDropdowns();
+                    $('#time-selectors').show();
+                },
+                error: function() {
+                    console.error('Error fetching time data');
+                    $('#time-selectors').hide();
+                }
+            });
+        }
+        
+        function populateTimeDropdowns() {
+            if (!availableTimes || availableTimes.length === 0) {
+                return;
+            }
+            
+            const startSelect = $('#start-time');
+            const endSelect = $('#end-time');
+            
+            // Clear previous options
+            startSelect.html('<option value="">--Select Start Time--</option>');
+            endSelect.html('<option value="">--Select End Time--</option>');
+            
+            // Populate start time (all times except the last)
+            for (let i = 0; i < availableTimes.length - 1; i++) {
+                const time = formatTimeForDisplay(availableTimes[i]);
+                startSelect.append(`<option value="${availableTimes[i]}">${time}</option>`);
+            }
+            
+            // Populate end time (all times except the first)
+            for (let i = 1; i < availableTimes.length; i++) {
+                const time = formatTimeForDisplay(availableTimes[i]);
+                endSelect.append(`<option value="${availableTimes[i]}">${time}</option>`);
+            }
+            
+            // Default values - first time for start, last time for end
+            startSelect.val(availableTimes[0]);
+            endSelect.val(availableTimes[availableTimes.length - 1]);
+        }
+        
+        function formatTimeForDisplay(timeString) {
+            const date = new Date(timeString);
+            return date.toLocaleString('en-US', { 
+                month: 'short', 
+                day: 'numeric', 
+                hour: 'numeric',
+                hour12: true 
+            });
+        }
+        
+        function updateTimeRange() {
+            const startTime = $('#start-time').val();
+            const endTime = $('#end-time').val();
+            
+            if (!startTime || !endTime || !currentPoint) {
+                return;
+            }
+            
+            // Validate that start time is before end time
+            const startIndex = availableTimes.indexOf(startTime);
+            const endIndex = availableTimes.indexOf(endTime);
+            
+            if (startIndex >= endIndex) {
+                alert('Start time must be before end time');
+                // Reset to previous valid values
+                $('#start-time').val(availableTimes[0]);
+                $('#end-time').val(availableTimes[availableTimes.length - 1]);
+                return;
+            }
+            
+            // Fetch updated plot with time range
+            $.ajax({
+                url: '/view_range/' + encodeURIComponent(currentPoint),
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    start_time: startTime,
+                    end_time: endTime
+                }),
+                success: function(data) {
+                    $('#plot-container').html(data);
+                    
+                    // Apply the same rendering fixes
+                    setTimeout(forceChartRendering, 50);
+                    setTimeout(forceChartRendering, 200);
+                    setTimeout(forceChartRendering, 500);
+                },
+                error: function() {
+                    // If error, revert to original plot
+                    $('#plot-container').html(originalPlotContent);
+                    alert('Error updating time range.');
+                }
+            });
         }
 
         function goBack() {
             window.location.href = "{{ url_for('index') }}";
         }
+
+        // Theme toggling functionality
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeToggleIcon(savedTheme);
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeToggleIcon(newTheme);
+        }
+
+        function updateThemeToggleIcon(theme) {
+            const themeIcon = document.querySelector('#theme-toggle i');
+            themeIcon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initTheme();
+            document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+        });
     </script>
 </body>
 </html>

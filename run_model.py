@@ -104,11 +104,13 @@ def main(args):
             try:
                 name, lat, lon, elevation = line.strip().split(',')
                 points_list.append([name, float(lat), float(lon), float(elevation)])
+                # Updated initialization for exceedance probabilities
                 point_data_dict[name] = {
                     'latitude': float(lat),
                     'longitude': float(lon),
                     'elevation': float(elevation),
-                    'exceedance_probabilities': {1: [], 3: [], 6: [], 12: [], 18: [], 24: [], 36: [], 48: [], 60: [], 100: []},
+                    'slr_exceedance_probabilities': {5: [], 8: [], 10: [], 12: [], 15: [], 20: [], 25: []},
+                    'total_snow_exceedance_probabilities': {1: [], 3: [], 6: [], 12: [], 18: [], 24: [], 36: [], 48: [], 60: [], 100: []},
                     'snow': [], 
                     'total_snow': [],
                     'tp': [],
@@ -201,47 +203,9 @@ def main(args):
                 print(f"Error during interpolation or plotting for step {step}: {e}")
                 continue
 
-    # # After processing, generate HTML files for each point
-    # for point in points_list:
-    #     if terminate:
-    #         print("Termination flag set. Skipping HTML generation.")
-    #         break
-    #     name = point[0]
-    #     # Implement HTML generation logic here
-    #     # For example:
-    #     html_content = f"""
-    #     <html>
-    #         <head>
-    #             <title>{name} Snowfall Forecast</title>
-    #             <style>
-    #                 body {{
-    #                     font-family: 'Roboto', sans-serif;
-    #                     padding: 20px;
-    #                     background-color: #f0f2f5;
-    #                 }}
-    #                 h1 {{
-    #                     color: #333333;
-    #                     text-align: center;
-    #                 }}
-    #             </style>
-    #         </head>
-    #         <body>
-    #             <h1>Data for {name}</h1>
-    #             <!-- Add detailed data visualization here -->
-    #         </body>
-    #     </html>
-    #     """
-    #     try:
-    #         with open(os.path.join('output', f"{name}.html"), 'w') as f:
-    #             f.write(html_content)
-    #     except Exception as e:
-    #         print(f"Error writing HTML for point {name}: {e}")
-
     if not terminate:
-        # Set progress to 100% upon completion
         update_progress(total_steps, total_steps, delta_t, step_durations, start_time)
     else:
-        # Set progress to 0% if terminated
         update_progress(0, total_steps, delta_t, step_durations, start_time)
 
 if __name__ == '__main__':

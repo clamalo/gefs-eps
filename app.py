@@ -15,10 +15,10 @@ app.secret_key = 'your_secure_secret_key'  # Replace with a secure key
 OUTPUT_DIR = os.path.join(os.getcwd(), 'output')
 MODEL_SCRIPT = 'run_model.py'  # Ensure this script exists
 PROGRESS_FILE = os.path.join(os.getcwd(), 'data', 'progress.json')
+POINTS_DATA_FILE = os.path.join(os.getcwd(), 'data', 'points_data_hourly.json')
 
 # Global variable to track the model subprocess
 model_process = None
-
 
 # Initialize progress.json on app start
 def initialize_progress():
@@ -161,6 +161,8 @@ def index():
                 '--eps', str(eps),
                 '--gefs', str(gefs)
             ])
+            # print the command
+            print(f"Running command: {sys.executable} {MODEL_SCRIPT} --date {date} --cycle {cycle} --starting_step {starting_step} --ending_step {ending_step} --delta_t {delta_t} --eps {eps} --gefs {gefs}")
             flash('Model is running. Check the <a href="{}">output visualization page</a> for results over the next few minutes as the model begins to run.'.format(url_for('outputs')), 'success')
         except Exception as e:
             flash(f'Error running model: {e}', 'error')
@@ -253,17 +255,144 @@ def outputs():
     points = [os.path.splitext(f)[0] for f in files]
     return render_template('output_viewer.html', points=points)
 
+# Updated route: returns plot content as HTML snippet for embedding
 @app.route('/view/<path:point>')
 def view_point(point):
-    # Decode the point name
     decoded_point = unquote(point)
     filename = f"{decoded_point}.html"
-    # Security check: Ensure that the file exists within the output directory
     file_path = os.path.join(OUTPUT_DIR, filename)
     if os.path.exists(file_path):
-        return send_from_directory(OUTPUT_DIR, filename)
+        with open(file_path, 'r') as f:
+            content = f.read()
+        return content
     else:
         return "Not Found", 404
+
+# New route: returns available times for a point
+@app.route('/get_times/<path:point>')
+def get_times(point):
+    decoded_point = unquote(point)
+    
+    if not os.path.exists(POINTS_DATA_FILE):
+        return jsonify({'error': 'Points data file not found'}), 404
+    
+    try:
+        with open(POINTS_DATA_FILE, 'r') as f:
+            points_data = json.load(f)
+        
+        if decoded_point not in points_data:
+            return jsonify({'error': 'Point not found in data'}), 404
+        
+        times = points_data[decoded_point].get('times', [])
+        return jsonify({'times': times})
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# New route: returns plot with specific time range
+@app.route('/view_range/<path:point>', methods=['POST'])
+def view_range(point):
+    decoded_point = unquote(point)
+    data = request.get_json()
+    
+    if not data or 'start_time' not in data or 'end_time' not in data:
+        return "Missing start or end time", 400
+    
+    start_time = data['start_time']
+    end_time = data['end_time']
+    
+    # Load the points data to get all available times
+    try:
+        with open(POINTS_DATA_FILE, 'r') as f:
+            points_data = json.load(f)
+        
+        if decoded_point not in points_data:
+            return "Point not found in data", 404
+        
+        # Get all times for validation
+        all_times = points_data[decoded_point].get('times', [])
+        
+        # Make sure start and end times are valid and in correct order
+        if start_time not in all_times or end_time not in all_times:
+            return "Invalid start or end time", 400
+        
+        start_index = all_times.index(start_time)
+        end_index = all_times.index(end_time)
+        
+        if start_index >= end_index:
+            return "Start time must be before end time", 400
+        
+        # Generate temporary plot HTML with specified time range
+        import tempfile
+        import os
+        from src.plotting import plot_points
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create a deep copy of the points data for this time range
+            filtered_data = {
+                'metadata': points_data['metadata'].copy(),
+                decoded_point: {}
+            }
+            
+            # Copy the basic point info
+            for key in ['latitude', 'longitude', 'elevation']:
+                if key in points_data[decoded_point]:
+                    filtered_data[decoded_point][key] = points_data[decoded_point][key]
+            
+            # Copy and filter the time-series data
+            filtered_data[decoded_point]['times'] = all_times[start_index:end_index+1]
+            
+            # Filter other time-series data
+            for key, value in points_data[decoded_point].items():
+                if key in ['latitude', 'longitude', 'elevation', 'times']:
+                    continue
+                
+                if key == 'slr_exceedance_probabilities' or key == 'total_snow_exceedance_probabilities':
+                    filtered_data[decoded_point][key] = {}
+                    for threshold, data_array in value.items():
+                        filtered_data[decoded_point][key][threshold] = data_array[start_index:end_index+1]
+                else:
+                    filtered_data[decoded_point][key] = value[start_index:end_index+1]
+            
+            # Save the filtered data to a temporary file
+            temp_points_data_file = os.path.join(temp_dir, 'points_data_hourly.json')
+            with open(temp_points_data_file, 'w') as f:
+                json.dump(filtered_data, f)
+            
+            # Create a temporary output directory
+            temp_output_dir = os.path.join(temp_dir, 'output')
+            os.makedirs(temp_output_dir, exist_ok=True)
+            
+            # Use plot_points.plot_specific_range to generate the plot
+            try:
+                # Determine if we're using GEFS and/or EPS from metadata if available
+                gefs = True
+                eps = False
+                if 'metadata' in points_data:
+                    # If metadata exists, try to extract GEFS/EPS info
+                    # This is a placeholder - you'd need to modify how you determine if GEFS/EPS
+                    # is being used based on your actual metadata structure
+                    pass
+                
+                # Custom plot function for time range plotting
+                from src.plotting.plot_points import plot_point_with_range
+                plot_point_with_range(decoded_point, filtered_data, temp_output_dir, gefs, eps)
+                
+                # Read the generated plot
+                temp_html_path = os.path.join(temp_output_dir, f"{decoded_point}.html") 
+                if not os.path.exists(temp_html_path):
+                    return "Failed to generate plot", 500
+                
+                with open(temp_html_path, 'r') as f:
+                    html_content = f.read()
+                
+                return html_content
+                
+            except Exception as e:
+                return f"Error generating plot: {str(e)}", 500
+    
+    except Exception as e:
+        return f"Error: {str(e)}", 500
 
 # New route for the map page
 @app.route('/map')

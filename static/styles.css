@@ -1,23 +1,61 @@
 /* static/styles.css */
+:root {
+    --background-color: #f0f2f5;
+    --container-bg: #ffffff;
+    --text-color: #333333;
+    --secondary-text-color: #555555;
+    --border-color: #cccccc;
+    --primary-color: #007bff;
+    --primary-hover: #0056b3;
+    --success-color: #28a745;
+    --success-hover: #218838;
+    --danger-color: #dc3545;
+    --danger-hover: #c82333;
+    --shadow: 0 4px 6px rgba(0,0,0,0.1);
+    --progress-bg: #e0e0e0;
+    --input-focus: #28a745;
+}
+
+[data-theme="dark"] {
+    --background-color: #121212;
+    --container-bg: #1e1e1e;
+    --text-color: #e0e0e0;
+    --secondary-text-color: #b0b0b0;
+    --border-color: #444444;
+    --primary-color: #0d6efd;
+    --primary-hover: #0b5ed7;
+    --success-color: #198754;
+    --success-hover: #157347;
+    --danger-color: #dc3545;
+    --danger-hover: #bb2d3b;
+    --shadow: 0 4px 6px rgba(0,0,0,0.3);
+    --progress-bg: #333333;
+    --input-focus: #198754;
+}
+
 body {
     font-family: 'Roboto', sans-serif;
-    background-color: #f0f2f5;
+    background-color: var(--background-color);
     margin: 0;
     padding: 0;
+    color: var(--text-color);
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .container {
     width: 80%;
     margin: 20px auto;
     padding: 30px;
-    background: #ffffff;
+    background: var(--container-bg);
     border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: var(--shadow);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    position: relative; /* Add this to make it a positioning context */
 }
 
 h1 {
     text-align: center;
-    color: #333333;
+    color: var(--text-color);
     margin-bottom: 20px;
 }
 
@@ -30,7 +68,7 @@ h1 {
 
 .nav-button {
     padding: 10px 20px;
-    background-color: #007bff;
+    background-color: var(--primary-color);
     color: #ffffff;
     text-decoration: none;
     border: none;
@@ -41,7 +79,27 @@ h1 {
 }
 
 .nav-button:hover {
-    background-color: #0056b3;
+    background-color: var(--primary-hover);
+    color: #ffffff; /* Ensure text remains visible on hover */
+}
+
+/* Theme toggle styles - Updated positioning */
+.theme-toggle {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 24px;
+    color: var(--text-color);
+    transition: transform 0.3s ease;
+    z-index: 100;
+}
+
+.theme-toggle:hover {
+    transform: rotate(30deg);
+    color: var(--text-color); /* Ensure icon remains visible on hover */
 }
 
 /* Notification Styles */
@@ -108,27 +166,29 @@ form {
 label {
     margin-top: 15px;
     margin-bottom: 5px;
-    color: #555555;
+    color: var(--secondary-text-color);
     font-weight: 500;
 }
 
 input[type="text"], select {
     padding: 12px 15px;
-    border: 1px solid #cccccc;
+    border: 1px solid var(--border-color);
     border-radius: 5px;
     font-size: 16px;
     transition: border-color 0.3s ease;
+    background-color: var(--container-bg);
+    color: var(--text-color);
 }
 
 input[type="text"]:focus, select:focus {
-    border-color: #28a745;
+    border-color: var(--input-focus);
     outline: none;
 }
 
 button {
     margin-top: 25px;
     padding: 12px;
-    background-color: #28a745;
+    background-color: var(--success-color);
     color: #ffffff;
     border: none;
     border-radius: 5px;
@@ -138,13 +198,14 @@ button {
 }
 
 button:hover {
-    background-color: #218838;
+    background-color: var(--success-hover);
+    color: #ffffff; /* Ensure text remains visible on hover */
 }
 
 .stop-button {
     margin-top: 15px;
     padding: 10px 15px;
-    background-color: #dc3545;
+    background-color: var(--danger-color);
     color: #ffffff;
     border: none;
     border-radius: 5px;
@@ -154,13 +215,14 @@ button:hover {
 }
 
 .stop-button:hover {
-    background-color: #c82333;
+    background-color: var(--danger-hover);
+    color: #ffffff; /* Ensure text remains visible on hover */
 }
 
 .back-button {
     margin-bottom: 20px;
     padding: 10px 15px;
-    background-color: #007bff;
+    background-color: var(--primary-color);
     color: #ffffff;
     border: none;
     border-radius: 5px;
@@ -170,7 +232,8 @@ button:hover {
 }
 
 .back-button:hover {
-    background-color: #0069d9;
+    background-color: var(--primary-hover);
+    color: #ffffff; /* Ensure text remains visible on hover */
 }
 
 iframe {
@@ -181,14 +244,14 @@ iframe {
 }
 
 a {
-    color: #007bff;
+    color: var(--primary-color);
     text-decoration: none;
     font-weight: 500;
     transition: color 0.3s ease;
 }
 
 a:hover {
-    color: #0056b3;
+    color: var(--primary-hover);
 }
 
 /* Progress Bar Styles */
@@ -199,9 +262,9 @@ a:hover {
 
 .progress-bar {
     width: 100%;
-    background-color: #e0e0e0;
+    background-color: var(--progress-bg);
     border-radius: 25px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow);
     overflow: hidden;
     height: 20px;
     margin-top: 10px;
@@ -220,7 +283,7 @@ a:hover {
     text-align: center;
     margin-top: 5px;
     font-weight: 500;
-    color: #555555;
+    color: var(--secondary-text-color);
 }
 
 .time-estimation {
@@ -228,7 +291,7 @@ a:hover {
     text-align: center;
     margin-top: 5px;
     font-weight: 500;
-    color: #555555;
+    color: var(--secondary-text-color);
 }
 
 /* Dynamic Animation for Progress Bar */

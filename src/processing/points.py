@@ -64,61 +64,35 @@ def slr(point_t2ms):
         xarray.DataArray: Snow Liquid Ratio values.
     """
     
-    # point_slrs = xr.where(
-    # point_t2ms >= 32, 6,
-    # xr.where(
-    #     point_t2ms >= 10, -0.8636 * point_t2ms + 33.636,
-    #     xr.where(
-    #         point_t2ms >= 0, 1.3 * point_t2ms + 12,
-    #         12
-    #     )
-    # )
-    # )
-
     point_slrs = xr.where(point_t2ms > 35.0, 0,
-
                 xr.where(point_t2ms >= 28.4,
                     8 + (point_t2ms - 32.0) * (10 - 8) / (28.4 - 32.0),
-
                 xr.where(point_t2ms >= 24.8,
                     10 + (point_t2ms - 28.4) * (11 - 10) / (24.8 - 28.4),
-
                 xr.where(point_t2ms >= 21.2,
                     11 + (point_t2ms - 24.8) * (12 - 11) / (21.2 - 24.8),
-
                 xr.where(point_t2ms >= 17.6,
                     12 + (point_t2ms - 21.2) * (13 - 12) / (17.6 - 21.2),
-
                 xr.where(point_t2ms >= 14.0,
                     13 + (point_t2ms - 17.6) * (15 - 13) / (14.0 - 17.6),
-
                 xr.where(point_t2ms >= 10.4,
                     15 + (point_t2ms - 14.0) * (20 - 15) / (10.4 - 14.0),
-
                 xr.where(point_t2ms >= 6.8,
                     20 + (point_t2ms - 10.4) * (25 - 20) / (6.8 - 10.4),
-
                 xr.where(point_t2ms >= 3.2,
                     25 + (point_t2ms - 6.8) * (28 - 25) / (3.2 - 6.8),
-
                 xr.where(point_t2ms >= -0.4,
                     28 + (point_t2ms - 3.2) * (25 - 28) / (-0.4 - 3.2),
-
                 xr.where(point_t2ms >= -4.0,
                     25 + (point_t2ms - (-0.4)) * (20 - 25) / (-4.0 - (-0.4)),
-
                 xr.where(point_t2ms >= -7.6,
                     20 + (point_t2ms - (-4.0)) * (15 - 20) / (-7.6 - (-4.0)),
-
                 xr.where(point_t2ms >= -11.2,
                     15 + (point_t2ms - (-7.6)) * (12 - 15) / (-11.2 - (-7.6)),
-
                 xr.where(point_t2ms >= -14.8,
                     12 + (point_t2ms - (-11.2)) * (10 - 12) / (-14.8 - (-11.2)),
-
-                    10  # For point_t2ms < -14.8
+                    10
                 ))))))))))))))
-
     return point_slrs
 
 def find_zero_c_elevation(ghs, point_t2ms, point_elevation):
@@ -136,28 +110,18 @@ def find_zero_c_elevation(ghs, point_t2ms, point_elevation):
     zero_c_elevation = []
 
     for ensemble_idx in range(point_t2ms.shape[0]):
-        # Find the isobaric level closest to the point elevation
         isobaric_levels = [gh.isel(number=ensemble_idx) for gh in ghs]
         closest_level = min(isobaric_levels, key=lambda level: abs(level.gh.data - point_elevation))
         level_elevation = closest_level.gh.data
         level_temp = closest_level.t.data
 
-        # Find the lapse rate between the surface temperature and the closest isobaric level
         surface_temp = point_t2ms.data[ensemble_idx]
         lapse_rate = (level_temp - surface_temp) / (level_elevation - point_elevation)
 
-        # Extrapolate the lapse rate to find the elevation where the atmosphere hits 0°C
         zero_c_elev = point_elevation + (274.26 - surface_temp) / lapse_rate 
-
         zero_c_elevation.append(zero_c_elev)
 
     return xr.DataArray(zero_c_elevation, coords={'number': range(point_t2ms.shape[0])})
-
-
-
-
-
-
 
 def process_frame(points_data_dict, ds, step, starting_step, delta_t, gefs, eps):
     """
@@ -199,7 +163,7 @@ def process_frame(points_data_dict, ds, step, starting_step, delta_t, gefs, eps)
                                        xr.where(point_elevation < ghs[3]['gh'], 
                                                 find_temperature_between(ghs[2], ghs[3], ['t', 'gh'], point_elevation),
                                                 find_temperature_between(ghs[3], ghs[4], ['t', 'gh'], point_elevation))))
-
+        
         snow_level = find_zero_c_elevation(ghs, point_t2ms, point_elevation) * 3.28084
         points_data_dict[point]['snow_level'].append(snow_level.values.tolist())
 
@@ -209,6 +173,11 @@ def process_frame(points_data_dict, ds, step, starting_step, delta_t, gefs, eps)
         # Snow Liquid Ratio (SLR)
         point_slrs = slr(point_t2ms)
         points_data_dict[point]['slr'].append(point_slrs.values.tolist())
+        
+        # Calculate SLR exceedance probabilities
+        for threshold in points_data_dict[point]['slr_exceedance_probabilities'].keys():
+            percentage_above_threshold = (float((point_slrs >= threshold).sum().values) / point_slrs.size) * 100
+            points_data_dict[point]['slr_exceedance_probabilities'][threshold].append(percentage_above_threshold)
 
         # Total Precipitation (TP)
         index_of_closest_lat = find_nearest(ds['latitude'].values, point_lat)
@@ -217,19 +186,15 @@ def process_frame(points_data_dict, ds, step, starting_step, delta_t, gefs, eps)
                           longitude=slice(index_of_closest_lon-1, index_of_closest_lon+2))
         near_array = near_ds['tp'].values
 
-        # Sample a radius of 0.12 degrees around the point in increments of 20 degrees
         tps = []
         for i in range(0, 360, 20):
             x = point_lon + 0.12 * np.cos(np.radians(i))
             y = point_lat + 0.12 * np.sin(np.radians(i))
-
-            index_of_closest_lat = find_nearest(near_ds['latitude'].values, y)
-            index_of_closest_lon = find_nearest(near_ds['longitude'].values, x)
-
-            tp = near_array[:, index_of_closest_lat, index_of_closest_lon]
+            idx_lat = find_nearest(near_ds['latitude'].values, y)
+            idx_lon = find_nearest(near_ds['longitude'].values, x)
+            tp = near_array[:, idx_lat, idx_lon]
             tps.append(tp)
         tps = np.array(tps)
-
         point_tps = tps.mean(axis=0)
         if eps:
             point_tps[0:50] = point_tps[0:50] * 39.3701 - (0 if step == starting_step else points_data_dict[point]['total_tp'][-1][0:50])
@@ -240,21 +205,19 @@ def process_frame(points_data_dict, ds, step, starting_step, delta_t, gefs, eps)
                 point_tps = point_tps * 0.0393701
         point_tps = np.maximum(point_tps, 0)
         points_data_dict[point]['tp'].append(point_tps.tolist())
-        point_total_tps = point_tps if step == starting_step else points_data_dict[point]['total_tp'][-1] + point_tps
+        point_total_tps = point_tps if step == starting_step else (np.array(points_data_dict[point]['total_tp'][-1]) + point_tps)
         points_data_dict[point]['total_tp'].append(point_total_tps.tolist())
 
         # Snow Calculation
         point_snows = point_tps * point_slrs
         points_data_dict[point]['snow'].append(point_snows.values.tolist())
-        point_total_snows = point_snows.values.tolist() if step == starting_step else (points_data_dict[point]['total_snow'][-1] + point_snows.values).tolist()
+        point_total_snows = point_snows.values.tolist() if step == starting_step else (np.array(points_data_dict[point]['total_snow'][-1]) + point_snows.values).tolist()
         points_data_dict[point]['total_snow'].append(point_total_snows)
 
-        # Exceedance Probability Calculation
-        #calculate the number of members that exceed each threshold without calculate_exceedance_probabilities
-        for threshold in points_data_dict[point]['exceedance_probabilities'].keys():
-            percentage_above_threshold = (np.sum(np.array(point_total_snows) >= threshold) / len(point_total_snows)) * 100
-            points_data_dict[point]['exceedance_probabilities'][threshold].append(percentage_above_threshold)
-
+        # Total Snow Exceedance Probability Calculation
+        for threshold in points_data_dict[point]['total_snow_exceedance_probabilities'].keys():
+            percentage_above_threshold = (float(np.sum(np.array(point_total_snows) >= threshold)) / len(point_total_snows)) * 100
+            points_data_dict[point]['total_snow_exceedance_probabilities'][threshold].append(percentage_above_threshold)
 
         # Times
         lat, lon = points_data_dict[point]['latitude'], points_data_dict[point]['longitude']
@@ -264,7 +227,6 @@ def process_frame(points_data_dict, ds, step, starting_step, delta_t, gefs, eps)
         datetime_date_cycle = utc_datetime_date_cycle.replace(tzinfo=pytz.utc).astimezone(timezone)
         points_data_dict[point]['times'].append((datetime_date_cycle + timedelta(hours=delta_t * (len(points_data_dict[point]['times']) + 1))).strftime('%Y-%m-%d %H:%M:%S'))
 
-    # Save to JSON
     with open(os.path.join(os.getcwd(), 'data', 'points_data.json'), 'w') as f:
         json.dump(points_data_dict, f)
 
@@ -277,59 +239,41 @@ def interpolate_hourly(delta_t):
     Loads data from 'data/points_data.json', performs interpolation on times and numerical data, and saves the modified data
     to 'data/points_data_hourly.json'.
     """
-    # Load the JSON data
     with open(os.path.join(os.getcwd(), 'data', 'points_data.json'), 'r') as file:
         points_data_dict = json.load(file)
 
     def interpolate_times(times):
-        """
-        Interpolate times to hourly intervals.
-
-        Args:
-            times (list): List of times in string format.
-
-        Returns:
-            list: List of interpolated times in string format.
-        """
         time_range = pd.date_range(start=times[0], end=times[-1], freq='h')
         return [time.strftime('%Y-%m-%d %H:%M:%S') for time in time_range]
 
     def interpolate_data(data):
-        """
-        Interpolate numerical data to hourly intervals.
-
-        Args:
-            data (np.ndarray): Original data to be interpolated.
-
-        Returns:
-            np.ndarray: Interpolated data.
-        """
         original_steps = np.arange(0, len(data))
         new_steps = np.linspace(0, len(data) - 1, (len(data) - 1) * delta_t + 1)
         interpolated_data = [interp1d(original_steps, member_data, kind='linear')(new_steps) for member_data in data.T]
         return np.array(interpolated_data).T
 
     for resort in points_data_dict.keys():
-        if resort == 'metadata': continue  # Skip metadata
-        # Interpolate times
+        if resort == 'metadata': continue
         points_data_dict[resort]['times'] = interpolate_times(points_data_dict[resort]['times'])
-        # Get all variables for the resort
         all_variables = list(points_data_dict[resort].keys())
-        variables_to_exclude = ['latitude', 'longitude', 'elevation', 'times', 'exceedance_probabilities']
-        # Interpolate each variable except for fixed values and exceedance probabilities
+        variables_to_exclude = ['latitude', 'longitude', 'elevation', 'times', 'total_snow_exceedance_probabilities', 'slr_exceedance_probabilities']
         variables_to_interpolate = [var for var in all_variables if var not in variables_to_exclude]
         for variable in variables_to_interpolate:
             data = np.array(points_data_dict[resort][variable])
             interpolated_data = interpolate_data(data)
             points_data_dict[resort][variable] = interpolated_data.tolist()
         
-        # Interpolate exceedance probabilities
-        for threshold in points_data_dict[resort]['exceedance_probabilities'].keys():
-            data = np.array(points_data_dict[resort]['exceedance_probabilities'][threshold])
+        for threshold in points_data_dict[resort]['total_snow_exceedance_probabilities'].keys():
+            data = np.array(points_data_dict[resort]['total_snow_exceedance_probabilities'][threshold])
             data = data.reshape((len(data), 1))
             interpolated_data = interpolate_data(data)
-            points_data_dict[resort]['exceedance_probabilities'][threshold] = interpolated_data.tolist()
+            points_data_dict[resort]['total_snow_exceedance_probabilities'][threshold] = interpolated_data.tolist()
+            
+        for threshold in points_data_dict[resort]['slr_exceedance_probabilities'].keys():
+            data = np.array(points_data_dict[resort]['slr_exceedance_probabilities'][threshold])
+            data = data.reshape((len(data), 1))
+            interpolated_data = interpolate_data(data)
+            points_data_dict[resort]['slr_exceedance_probabilities'][threshold] = interpolated_data.tolist()
 
-    # Save the modified data to a new JSON file
     with open(os.path.join(os.getcwd(), 'data', 'points_data_hourly.json'), 'w') as outfile:
         json.dump(points_data_dict, outfile)

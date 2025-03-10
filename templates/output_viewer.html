@@ -71,6 +71,8 @@
         let availableTimes = [];
         let originalPlotContent = '';
         let currentPoint = '';
+        let selectedStartTime = ''; // Add variable to store selected start time
+        let selectedEndTime = '';   // Add variable to store selected end time
         
         function viewPoint(point) {
             if (point) {
@@ -167,6 +169,12 @@
                     availableTimes = data.times;
                     populateTimeDropdowns();
                     $('#time-selectors').show();
+                    
+                    // If we have stored time range values and new times are loaded,
+                    // update the plot with the previously selected range
+                    if (selectedStartTime && selectedEndTime) {
+                        updateTimeRange();
+                    }
                 },
                 error: function() {
                     console.error('Error fetching time data');
@@ -199,9 +207,70 @@
                 endSelect.append(`<option value="${availableTimes[i]}">${time}</option>`);
             }
             
-            // Default values - first time for start, last time for end
-            startSelect.val(availableTimes[0]);
-            endSelect.val(availableTimes[availableTimes.length - 1]);
+            // Try to set the previously selected times, or use defaults if not available
+            let startIndex = 0;
+            let endIndex = availableTimes.length - 1;
+            
+            if (selectedStartTime) {
+                // Find the closest match or exact match in available times
+                if (availableTimes.includes(selectedStartTime)) {
+                    startSelect.val(selectedStartTime);
+                } else {
+                    // Find the closest time that's available
+                    const selectedDate = new Date(selectedStartTime).getTime();
+                    let closestTime = availableTimes[0];
+                    let minDiff = Math.abs(new Date(closestTime).getTime() - selectedDate);
+                    
+                    for (let i = 1; i < availableTimes.length - 1; i++) {
+                        const diff = Math.abs(new Date(availableTimes[i]).getTime() - selectedDate);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            closestTime = availableTimes[i];
+                        }
+                    }
+                    startSelect.val(closestTime);
+                }
+            } else {
+                // No previously selected time, use default
+                startSelect.val(availableTimes[0]);
+            }
+            
+            if (selectedEndTime) {
+                // Find the closest match or exact match in available times
+                if (availableTimes.includes(selectedEndTime)) {
+                    endSelect.val(selectedEndTime);
+                } else {
+                    // Find the closest time that's available
+                    const selectedDate = new Date(selectedEndTime).getTime();
+                    let closestTime = availableTimes[availableTimes.length - 1];
+                    let minDiff = Math.abs(new Date(closestTime).getTime() - selectedDate);
+                    
+                    for (let i = 1; i < availableTimes.length; i++) {
+                        const diff = Math.abs(new Date(availableTimes[i]).getTime() - selectedDate);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            closestTime = availableTimes[i];
+                        }
+                    }
+                    endSelect.val(closestTime);
+                }
+            } else {
+                // No previously selected time, use default
+                endSelect.val(availableTimes[availableTimes.length - 1]);
+            }
+            
+            // Ensure start is before end
+            const startVal = startSelect.val();
+            const endVal = endSelect.val();
+            if (startVal && endVal) {
+                const startIdx = availableTimes.indexOf(startVal);
+                const endIdx = availableTimes.indexOf(endVal);
+                if (startIdx >= endIdx) {
+                    // If times are invalid, reset to defaults
+                    startSelect.val(availableTimes[0]);
+                    endSelect.val(availableTimes[availableTimes.length - 1]);
+                }
+            }
         }
         
         function formatTimeForDisplay(timeString) {
@@ -233,6 +302,10 @@
                 $('#end-time').val(availableTimes[availableTimes.length - 1]);
                 return;
             }
+            
+            // Store the selected times for persistence between point changes
+            selectedStartTime = startTime;
+            selectedEndTime = endTime;
             
             // Fetch updated plot with time range
             $.ajax({

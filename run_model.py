@@ -174,6 +174,14 @@ def main(args):
                     # Convert geopotential (m^2/s^2) to geopotential height (m).
                     aifs_ds['z'] = aifs_ds['z'] / 9.80665
                     aifs_ds = aifs_ds.rename({'z': 'gh'})
+                if 'tp' in aifs_ds:
+                    tp_units = (aifs_ds['tp'].attrs.get('units') or '').strip().lower()
+                    if not tp_units:
+                        tp_units = (aifs_ds['tp'].attrs.get('GRIB_units') or '').strip().lower()
+                    if tp_units in ('mm', 'kg m-2', 'kg m**-2', 'kg m^-2', 'kg/m^2'):
+                        # Normalize AIFS tp to meters to match EPS handling downstream.
+                        aifs_ds['tp'] = aifs_ds['tp'] / 1000.0
+                        aifs_ds['tp'].attrs['units'] = 'm'
                 aifs_ds = dataset_processing.crop(aifs_ds, points_list)
                 ensemble_counts['aifs'] = aifs_ds.sizes.get('number', 0)
                 ensemble_order.append('aifs')

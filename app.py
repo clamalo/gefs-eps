@@ -112,6 +112,10 @@ def index():
             flash('Starting Step, Ending Step, and Delta_t must be integers.', 'error')
             return redirect(url_for('index'))
 
+        if starting_step % 6 != 0:
+            flash('Starting Step must be a multiple of 6.', 'error')
+            return redirect(url_for('index'))
+
         if aifs and delta_t != 6:
             flash('Delta_t must be 6 when AIFS-E is True.', 'error')
             return redirect(url_for('index'))

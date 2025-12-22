@@ -132,6 +132,7 @@ def main(args):
 
     steps = list(range(starting_step, ending_step +1, delta_t))
     total_steps = len(steps)
+    single_step_run = total_steps == 1
 
     start_time = time.time()
     step_durations = []  # List to store duration of each step
@@ -145,7 +146,7 @@ def main(args):
         print(f"Processing step: {step}")
 
         try:
-            asyncio.run(ingest.ingest(date, cycle, step, gefs, eps, aifs))
+            downloaded = asyncio.run(ingest.ingest(date, cycle, step, gefs, eps, aifs))
         except Exception as e:
             print(f"Error during ingestion for step {step}: {e}")
             step_durations.append(time.time() - step_start_time)
@@ -158,6 +159,22 @@ def main(args):
         if eps:
             try:
                 eps_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'ecmwf_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+            except Exception as e:
+                if not downloaded.get('eps', False):
+                    print(f"Retrying EPS download after load failure: {e}")
+                    try:
+                        asyncio.run(ingest.ingest(date, cycle, step, gefs=False, eps=True, aifs=False, force=True))
+                        downloaded['eps'] = True
+                        eps_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'ecmwf_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                    except Exception as retry_error:
+                        print(f"Error loading EPS dataset for step {step}: {retry_error}")
+                        step_durations.append(time.time() - step_start_time)
+                        continue
+                else:
+                    print(f"Error loading EPS dataset for step {step}: {e}")
+                    step_durations.append(time.time() - step_start_time)
+                    continue
+            try:
                 eps_ds = dataset_processing.crop(eps_ds, points_list)
                 ensemble_counts['eps'] = eps_ds.sizes.get('number', 0)
                 ensemble_order.append('eps')
@@ -169,7 +186,29 @@ def main(args):
 
         if aifs:
             try:
-                aifs_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'aifs_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                aifs_path = os.path.join(os.getcwd(), 'data', f'aifs_{step}.grib2')
+                def load_aifs_dataset(path):
+                    aifs_t = xr.load_dataset(path, engine='cfgrib', filter_by_keys={'dataType': 'pf', 'paramId': 130})
+                    aifs_z = xr.load_dataset(path, engine='cfgrib', filter_by_keys={'dataType': 'pf', 'paramId': 129})
+                    aifs_tp = xr.load_dataset(path, engine='cfgrib', filter_by_keys={'dataType': 'pf', 'shortName': 'tp'})
+                    return xr.merge([aifs_t, aifs_z, aifs_tp])
+                aifs_ds = load_aifs_dataset(aifs_path)
+            except Exception as e:
+                if not downloaded.get('aifs', False):
+                    print(f"Retrying AIFS download after load failure: {e}")
+                    try:
+                        asyncio.run(ingest.ingest(date, cycle, step, gefs=False, eps=False, aifs=True, force=True))
+                        downloaded['aifs'] = True
+                        aifs_ds = load_aifs_dataset(aifs_path)
+                    except Exception as retry_error:
+                        print(f"Error loading AIFS-E dataset for step {step}: {retry_error}")
+                        step_durations.append(time.time() - step_start_time)
+                        continue
+                else:
+                    print(f"Error loading AIFS-E dataset for step {step}: {e}")
+                    step_durations.append(time.time() - step_start_time)
+                    continue
+            try:
                 if 'gh' not in aifs_ds and 'z' in aifs_ds:
                     # Convert geopotential (m^2/s^2) to geopotential height (m).
                     aifs_ds['z'] = aifs_ds['z'] / 9.80665
@@ -194,13 +233,45 @@ def main(args):
         if gefs:
             try:
                 gefs_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'gefs_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+            except Exception as e:
+                if not downloaded.get('gefs', False):
+                    print(f"Retrying GEFS download after load failure: {e}")
+                    try:
+                        asyncio.run(ingest.ingest(date, cycle, step, gefs=True, eps=False, aifs=False, force=True))
+                        downloaded['gefs'] = True
+                        gefs_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'gefs_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                    except Exception as retry_error:
+                        print(f"Error loading GEFS dataset for step {step}: {retry_error}")
+                        step_durations.append(time.time() - step_start_time)
+                        continue
+                else:
+                    print(f"Error loading GEFS dataset for step {step}: {e}")
+                    step_durations.append(time.time() - step_start_time)
+                    continue
+            try:
                 if step != 3 and step % 6 == 0 and delta_t == 3:
                     prior_gefs_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'gefs_{step-3}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
                     gefs_ds = gefs_ds - prior_gefs_ds
                 gefs_ds = gefs_ds.assign_coords(longitude=(((gefs_ds.longitude + 180) % 360) - 180)).sortby('longitude')
                 gefs_ds = dataset_processing.crop(gefs_ds, points_list)
 
-                p_gefs_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'p_gefs_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                try:
+                    p_gefs_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'p_gefs_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                except Exception as e:
+                    if not downloaded.get('p_gefs', False):
+                        print(f"Retrying GEFS pressure-level download after load failure: {e}")
+                        try:
+                            asyncio.run(ingest.ingest(date, cycle, step, gefs=True, eps=False, aifs=False, force=True))
+                            downloaded['p_gefs'] = True
+                            p_gefs_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'p_gefs_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                        except Exception as retry_error:
+                            print(f"Error loading GEFS dataset for step {step}: {retry_error}")
+                            step_durations.append(time.time() - step_start_time)
+                            continue
+                    else:
+                        print(f"Error loading GEFS dataset for step {step}: {e}")
+                        step_durations.append(time.time() - step_start_time)
+                        continue
                 p_gefs_ds = p_gefs_ds.assign_coords(longitude=(((p_gefs_ds.longitude + 180) % 360) - 180)).sortby('longitude')
                 p_gefs_ds = dataset_processing.crop(p_gefs_ds, points_list)
                 p_gefs_ds = p_gefs_ds.interp(latitude=gefs_ds.latitude, longitude=gefs_ds.longitude)
@@ -231,7 +302,7 @@ def main(args):
         current_step_num = steps.index(step) +1  # 1-based index
         update_progress(current_step_num, total_steps, delta_t, step_durations, start_time)
 
-        if step % 6 == 0 or step == ending_step:
+        if not single_step_run and (step % 6 == 0 or step == ending_step):
             try:
                 points_processing.interpolate_hourly(delta_t)
                 plot_points.plot_points(gefs, eps, aifs)

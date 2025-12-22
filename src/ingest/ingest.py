@@ -6,6 +6,7 @@ import aiofiles
 from tqdm.asyncio import tqdm as atqdm
 from io import StringIO
 import os
+import glob
 import multiprocessing
 import logging
 from asyncio import Semaphore
@@ -219,9 +220,10 @@ async def download_gefs(date, cycle, step, req_param, req_level, output_file, mo
                 except Exception as e:
                     logging.error(f"Error downloading GEFS chunk: {e}")
 
-async def ingest(date, cycle, step, gefs, eps, aifs):
+async def ingest(date, cycle, step, gefs, eps, aifs, force=False):
     data_dir = os.path.join(os.getcwd(), 'data')
     os.makedirs(data_dir, exist_ok=True)
+    downloaded = {'eps': False, 'aifs': False, 'gefs': False, 'p_gefs': False}
 
     # Determine initial semaphore limit based on CPU cores
     cpu_cores = multiprocessing.cpu_count()
@@ -235,63 +237,110 @@ async def ingest(date, cycle, step, gefs, eps, aifs):
     connector = aiohttp.TCPConnector(limit_per_host=semaphore_manager.current_limit())
     timeout = aiohttp.ClientTimeout(total=GLOBAL_TIMEOUT)
     async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
-        if eps:
-            req_param = ["gh", "t"]
-            req_level = ["1000 hPa", "925 hPa", "850 hPa", "700 hPa", "500 hPa"]
-            await download_data(
-                date, cycle, step, req_param, req_level,
-                os.path.join(data_dir, f'ecmwf_{step}.grib2'), mode='wb',
-                semaphore_manager=semaphore_manager,
-                session=session
-            )
+        def has_local_file(path):
+            return os.path.exists(path) and os.path.getsize(path) > 0
+        def normalize_mtime(path):
+            if not os.path.exists(path):
+                return
+            os.utime(path, None)
+            for idx_path in glob.glob(f"{path}.*.idx"):
+                os.utime(idx_path, None)
 
-            req_param = ["tp"]
-            await download_data(
-                date, cycle, step, req_param, None,
-                os.path.join(data_dir, f'ecmwf_{step}.grib2'), mode='ab',
-                semaphore_manager=semaphore_manager,
-                session=session
-            )
+        if eps:
+            eps_path = os.path.join(data_dir, f'ecmwf_{step}.grib2')
+            if not force and has_local_file(eps_path):
+                logging.info(f"Skipping EPS download; found existing file at {eps_path}")
+                normalize_mtime(eps_path)
+            else:
+                if force:
+                    logging.info(f"Forcing EPS download; overwriting {eps_path}")
+                req_param = ["gh", "t"]
+                req_level = ["1000 hPa", "925 hPa", "850 hPa", "700 hPa", "500 hPa"]
+                await download_data(
+                    date, cycle, step, req_param, req_level,
+                    eps_path, mode='wb',
+                    semaphore_manager=semaphore_manager,
+                    session=session
+                )
+
+                req_param = ["tp"]
+                await download_data(
+                    date, cycle, step, req_param, None,
+                    eps_path, mode='ab',
+                    semaphore_manager=semaphore_manager,
+                    session=session
+                )
+                normalize_mtime(eps_path)
+                downloaded['eps'] = True
 
         if aifs:
-            req_param = ["z", "t"]
-            req_level = ["1000 hPa", "925 hPa", "850 hPa", "700 hPa", "500 hPa"]
-            await download_data(
-                date, cycle, step, req_param, req_level,
-                os.path.join(data_dir, f'aifs_{step}.grib2'), mode='wb',
-                semaphore_manager=semaphore_manager,
-                session=session,
-                model="aifs-ens",
-                file_tag="enfo-pf"
-            )
+            aifs_path = os.path.join(data_dir, f'aifs_{step}.grib2')
+            if not force and has_local_file(aifs_path):
+                logging.info(f"Skipping AIFS download; found existing file at {aifs_path}")
+                normalize_mtime(aifs_path)
+            else:
+                if force:
+                    logging.info(f"Forcing AIFS download; overwriting {aifs_path}")
+                req_param = ["z", "t"]
+                req_level = ["1000 hPa", "925 hPa", "850 hPa", "700 hPa", "500 hPa"]
+                await download_data(
+                    date, cycle, step, req_param, req_level,
+                    aifs_path, mode='wb',
+                    semaphore_manager=semaphore_manager,
+                    session=session,
+                    model="aifs-ens",
+                    file_tag="enfo-pf"
+                )
 
-            req_param = ["tp"]
-            await download_data(
-                date, cycle, step, req_param, None,
-                os.path.join(data_dir, f'aifs_{step}.grib2'), mode='ab',
-                semaphore_manager=semaphore_manager,
-                session=session,
-                model="aifs-ens",
-                file_tag="enfo-pf"
-            )
+                req_param = ["tp"]
+                await download_data(
+                    date, cycle, step, req_param, None,
+                    aifs_path, mode='ab',
+                    semaphore_manager=semaphore_manager,
+                    session=session,
+                    model="aifs-ens",
+                    file_tag="enfo-pf"
+                )
+                normalize_mtime(aifs_path)
+                downloaded['aifs'] = True
 
         if gefs:
+            gefs_path = os.path.join(data_dir, f'gefs_{step}.grib2')
+            p_gefs_path = os.path.join(data_dir, f'p_gefs_{step}.grib2')
             req_param = ["APCP"]
-            await download_gefs(
-                date, cycle, step, req_param, None,
-                os.path.join(data_dir, f'gefs_{step}.grib2'), mode='wb',
-                semaphore_manager=semaphore_manager,
-                session=session
-            )
+            if not force and has_local_file(gefs_path):
+                logging.info(f"Skipping GEFS APCP download; found existing file at {gefs_path}")
+                normalize_mtime(gefs_path)
+            else:
+                if force:
+                    logging.info(f"Forcing GEFS APCP download; overwriting {gefs_path}")
+                await download_gefs(
+                    date, cycle, step, req_param, None,
+                    gefs_path, mode='wb',
+                    semaphore_manager=semaphore_manager,
+                    session=session
+                )
+                normalize_mtime(gefs_path)
+                downloaded['gefs'] = True
 
             req_param = ["HGT", "TMP"]
             req_level = ["1000 mb", "925 mb", "850 mb", "700 mb", "500 mb"]
-            await download_gefs(
-                date, cycle, step, req_param, req_level,
-                os.path.join(data_dir, f'p_gefs_{step}.grib2'), mode='wb',
-                semaphore_manager=semaphore_manager,
-                session=session
-            )
+            if not force and has_local_file(p_gefs_path):
+                logging.info(f"Skipping GEFS pressure-level download; found existing file at {p_gefs_path}")
+                normalize_mtime(p_gefs_path)
+            else:
+                if force:
+                    logging.info(f"Forcing GEFS pressure-level download; overwriting {p_gefs_path}")
+                await download_gefs(
+                    date, cycle, step, req_param, req_level,
+                    p_gefs_path, mode='wb',
+                    semaphore_manager=semaphore_manager,
+                    session=session
+                )
+                normalize_mtime(p_gefs_path)
+                downloaded['p_gefs'] = True
+
+    return downloaded
 
 # Example usage:
 # asyncio.run(ingest('20240101', '00', '06', gefs=True, eps=True))

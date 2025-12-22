@@ -18,7 +18,7 @@
             <i class="fas fa-moon"></i>
         </button>
         
-        <h1>GEFS + EPS Super Ensemble Dashboard</h1>
+        <h1>GEFS + EPS + AIFS-E Super Ensemble Dashboard</h1>
 
         <!-- Navigation Buttons -->
         <div class="nav-buttons">
@@ -77,7 +77,16 @@
                 <option value="False">False</option>
             </select>
 
-            <button type="submit">RUN</button>
+            <label for="AIFS_E">AIFS-E:</label>
+            <select id="AIFS_E" name="AIFS_E" required>
+                <option value="True">True</option>
+                <option value="False" selected>False</option>
+            </select>
+
+            <button type="submit" id="run-button">RUN</button>
+            <div id="run-requirement" class="form-hint" role="status" aria-live="polite">
+                AIFS-E requires Delta_t = 6.
+            </div>
         </form>
     </div>
 
@@ -123,6 +132,15 @@
             }, 5000);
         }
 
+        function updateRunButtonState() {
+            const aifsSelected = $('#AIFS_E').val() === 'True';
+            const deltaValue = $('#delta_t').val().trim();
+            const deltaParsed = parseInt(deltaValue, 10);
+            const isValid = !aifsSelected || deltaParsed === 6;
+            $('#run-button').prop('disabled', !isValid);
+            $('#run-requirement').toggle(!isValid);
+        }
+
         function updateProgress() {
             $.ajax({
                 url: "{{ url_for('progress') }}",
@@ -163,6 +181,12 @@
                 }
             });
         }
+
+        $(document).ready(function() {
+            updateRunButtonState();
+            $('#AIFS_E').on('change', updateRunButtonState);
+            $('#delta_t').on('input', updateRunButtonState);
+        });
 
         function checkStatus() {
             $.ajax({

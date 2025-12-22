@@ -1,6 +1,6 @@
-# GEFS + EPS Super Ensemble Snowfall Prediction Tool
+# GEFS + EPS + AIFS-E Super Ensemble Snowfall Prediction Tool
 
-This tool provides a web-based interface to run a super ensemble snowfall prediction model using GEFS and EPS data. It allows users to manage geographic points, run the model, and view the outputs.
+This tool provides a web-based interface to run a super ensemble snowfall prediction model using GEFS, EPS, and AIFS-E data. It allows users to manage geographic points, run the model, and view the outputs.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ This tool provides a web-based interface to run a super ensemble snowfall predic
 
 - Interactive web interface built with Flask.
 - Map-based point management using Leaflet.
-- Run snowfall prediction models using GEFS and EPS data.
+- Run snowfall prediction models using GEFS, EPS, and AIFS-E data.
 - Real-time progress tracking.
 - Visualization of outputs.
 
@@ -114,6 +114,7 @@ See the [Python website](https://www.python.org/downloads/) for Python installat
    - **Delta_t:** Enter the time step interval in hours. Defaults to `3` if left blank.
    - **EPS:** Select `True` to include EPS data, or `False` to exclude it. Defaults to `False`.
    - **GEFS:** Select `True` to include GEFS data, or `False` to exclude it. Defaults to `True`.
+   - **AIFS-E:** Select `True` to include AIFS-E data, or `False` to exclude it. Defaults to `False`.
 
 3. **Run the model**
 

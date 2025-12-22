@@ -123,7 +123,41 @@ def find_zero_c_elevation(ghs, point_t2ms, point_elevation):
 
     return xr.DataArray(zero_c_elevation, coords={'number': range(point_t2ms.shape[0])})
 
-def process_frame(points_data_dict, ds, step, starting_step, delta_t, gefs, eps):
+def build_ensemble_slices(total_members, metadata, eps, aifs, gefs):
+    ensemble_order = metadata.get('ensemble_order', [])
+    ensemble_counts = metadata.get('ensemble_counts', {})
+    slices = []
+
+    if isinstance(ensemble_order, list) and isinstance(ensemble_counts, dict):
+        offset = 0
+        for name in ensemble_order:
+            count = int(ensemble_counts.get(name, 0) or 0)
+            if count <= 0:
+                continue
+            end = min(offset + count, total_members)
+            if end > offset:
+                slices.append((name, slice(offset, end)))
+            offset = end
+
+        if slices:
+            return slices
+
+    offset = 0
+    if eps:
+        end = min(offset + 50, total_members)
+        if end > offset:
+            slices.append(('eps', slice(offset, end)))
+        offset = end
+    if gefs:
+        end = min(offset + 30, total_members)
+        if end > offset:
+            slices.append(('gefs', slice(offset, end)))
+    if aifs and not slices and total_members > 0:
+        slices.append(('aifs', slice(0, total_members)))
+
+    return slices
+
+def process_frame(points_data_dict, ds, step, starting_step, delta_t, gefs, eps, aifs):
     """
     Process a single frame of data and update the points data dictionary.
 
@@ -134,6 +168,7 @@ def process_frame(points_data_dict, ds, step, starting_step, delta_t, gefs, eps)
         starting_step (int): Initial time step.
         gefs (bool): Flag indicating whether GEFS data is included.
         eps (bool): Flag indicating whether EPS data is included.
+        aifs (bool): Flag indicating whether AIFS-E data is included.
 
     Returns:
         dict: Updated points data dictionary.
@@ -195,14 +230,29 @@ def process_frame(points_data_dict, ds, step, starting_step, delta_t, gefs, eps)
             tp = near_array[:, idx_lat, idx_lon]
             tps.append(tp)
         tps = np.array(tps)
-        point_tps = tps.mean(axis=0)
-        if eps:
-            point_tps[0:50] = point_tps[0:50] * 39.3701 - (0 if step == starting_step else points_data_dict[point]['total_tp'][-1][0:50])
-        if gefs:
-            if eps:
-                point_tps[50:] = point_tps[50:] * 0.0393701
-            else:
-                point_tps = point_tps * 0.0393701
+        point_tps = np.array(tps.mean(axis=0))
+        prev_total = None
+        if step != starting_step and points_data_dict[point]['total_tp']:
+            prev_total = np.array(points_data_dict[point]['total_tp'][-1])
+
+        ensemble_slices = build_ensemble_slices(
+            point_tps.shape[0],
+            points_data_dict.get('metadata', {}),
+            eps,
+            aifs,
+            gefs
+        )
+
+        for name, member_slice in ensemble_slices:
+            if member_slice.start >= member_slice.stop:
+                continue
+            if name in ('eps', 'aifs'):
+                converted = point_tps[member_slice] * 39.3701
+                if prev_total is not None:
+                    converted = converted - prev_total[member_slice]
+                point_tps[member_slice] = converted
+            elif name == 'gefs':
+                point_tps[member_slice] = point_tps[member_slice] * 0.0393701
         point_tps = np.maximum(point_tps, 0)
         points_data_dict[point]['tp'].append(point_tps.tolist())
         point_total_tps = point_tps if step == starting_step else (np.array(points_data_dict[point]['total_tp'][-1]) + point_tps)

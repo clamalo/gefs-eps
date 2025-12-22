@@ -71,7 +71,7 @@ async def parse_idx(session, idx_link):
     r = await fetch(session, idx_link)
     idx = [json.loads(line) for line in r.splitlines()]
     idx_df = pd.DataFrame(idx)
-    idx_df.drop(columns=["domain", "stream", "date", "time", "expver", "class", "step"], inplace=True)
+    idx_df.drop(columns=["domain", "stream", "date", "time", "expver", "class", "step"], inplace=True, errors="ignore")
     idx_df["member"] = idx_df["number"].apply(lambda x: f"p{int(x):02d}" if not pd.isna(x) else "c00")
     idx_df.drop(columns=["number"], inplace=True)
     idx_df["level"] = idx_df.apply(lambda x: x["levtype"] if x["levtype"] == "sfc" else x["levelist"] + " hPa", axis=1)
@@ -123,11 +123,12 @@ async def download(session, url, start, end, sem, semaphore_manager, max_retries
     logging.error(f"Failed to download {url} bytes {start}-{end} after {max_retries} attempts")
     raise Exception(f"Failed to download {url} bytes {start}-{end} after {max_retries} attempts")
 
-async def download_data(date, cycle, step, req_param, req_level, output_file, mode='wb', semaphore_manager=None, session=None):
+async def download_data(date, cycle, step, req_param, req_level, output_file, mode='wb',
+                        semaphore_manager=None, session=None, model="ifs", file_tag="enfo-ef"):
     # ROOT = "https://ecmwf-forecasts.s3.eu-central-1.amazonaws.com"
     ROOT = "https://data.ecmwf.int/forecasts"
-    host = f"{ROOT}/{date}/{cycle}z/ifs/0p25/enfo"
-    idx_link = f"{host}/{date}{cycle}0000-{step}h-enfo-ef.index"
+    host = f"{ROOT}/{date}/{cycle}z/{model}/0p25/enfo"
+    idx_link = f"{host}/{date}{cycle}0000-{step}h-{file_tag}.index"
 
     idx_df = await parse_idx(session, idx_link)
     if req_level is None:
@@ -135,7 +136,7 @@ async def download_data(date, cycle, step, req_param, req_level, output_file, mo
     else:
         idx_df = idx_df[(idx_df.param.isin(req_param)) & (idx_df.level.isin(req_level))]
     idx = idx_df.to_dict(orient="records")
-    pgrb2_link = f"{host}/{date}{cycle}0000-{step}h-enfo-ef.grib2"
+    pgrb2_link = f"{host}/{date}{cycle}0000-{step}h-{file_tag}.grib2"
 
     tasks = [
         download(session, pgrb2_link, record["start"], record["end"], semaphore_manager, semaphore_manager)
@@ -218,7 +219,7 @@ async def download_gefs(date, cycle, step, req_param, req_level, output_file, mo
                 except Exception as e:
                     logging.error(f"Error downloading GEFS chunk: {e}")
 
-async def ingest(date, cycle, step, gefs, eps):
+async def ingest(date, cycle, step, gefs, eps, aifs):
     data_dir = os.path.join(os.getcwd(), 'data')
     os.makedirs(data_dir, exist_ok=True)
 
@@ -250,6 +251,28 @@ async def ingest(date, cycle, step, gefs, eps):
                 os.path.join(data_dir, f'ecmwf_{step}.grib2'), mode='ab',
                 semaphore_manager=semaphore_manager,
                 session=session
+            )
+
+        if aifs:
+            req_param = ["z", "t"]
+            req_level = ["1000 hPa", "925 hPa", "850 hPa", "700 hPa", "500 hPa"]
+            await download_data(
+                date, cycle, step, req_param, req_level,
+                os.path.join(data_dir, f'aifs_{step}.grib2'), mode='wb',
+                semaphore_manager=semaphore_manager,
+                session=session,
+                model="aifs-ens",
+                file_tag="enfo-pf"
+            )
+
+            req_param = ["tp"]
+            await download_data(
+                date, cycle, step, req_param, None,
+                os.path.join(data_dir, f'aifs_{step}.grib2'), mode='ab',
+                semaphore_manager=semaphore_manager,
+                session=session,
+                model="aifs-ens",
+                file_tag="enfo-pf"
             )
 
         if gefs:

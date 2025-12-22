@@ -16,6 +16,32 @@ def mean_across_steps(list):
 def member_across_steps(list, n):
     return np.array(list)[:, n]
 
+def infer_num_members(point_data, metadata, gefs, eps, aifs):
+    if isinstance(metadata, dict):
+        ensemble_counts = metadata.get('ensemble_counts')
+        if isinstance(ensemble_counts, dict):
+            total = sum(int(v) for v in ensemble_counts.values() if v)
+            if total > 0:
+                return total
+
+    for key, value in point_data.items():
+        if key in ['latitude', 'longitude', 'elevation', 'times']:
+            continue
+        if isinstance(value, list) and value:
+            first = value[0]
+            if isinstance(first, list):
+                return len(first)
+
+    if gefs and eps:
+        return 80
+    if eps and not gefs:
+        return 50
+    if gefs and not eps:
+        return 30
+    if aifs:
+        return 50
+    return 0
+
 def add_line(fig, row, member, x_values, line, name, variable, lower_percentile=None, upper_percentile=None):
     color_dict = {'total_snow': '#0000ff', 'snow': '#0000ff', 'slr': 'blue', 
                   'tp': 'limegreen', 'total_tp': 'limegreen', 'temp': 'orange', 
@@ -131,9 +157,10 @@ def plot_exceedance_probabilities(fig, row, point_data, x_values, variable_name)
     fig.update_yaxes(range=[y_min, y_max], row=row, col=1)
     fig.update_yaxes(title_text='Exceedance Probability (%)', row=row, col=1)
 
-def plot_points(gefs, eps):
+def plot_points(gefs, eps, aifs=False):
     with open(os.path.join(os.getcwd(), 'data', 'points_data_hourly.json'), 'r') as f:
         points_data_dict = json.load(f)
+    metadata = points_data_dict.get('metadata', {})
 
     for point in points_data_dict:
         if point == 'metadata':
@@ -169,13 +196,11 @@ def plot_points(gefs, eps):
             y_values = np.array(data[variable]).flatten()
             y_min, y_max = min(y_values), max(y_values)
 
+            num_members = infer_num_members(data, metadata, gefs, eps, aifs)
             member_lines = []
-            if gefs and eps:
-                num_members = 80
-            elif eps and not gefs:
-                num_members = 50
-            elif gefs and not eps:
-                num_members = 30
+            if num_members == 0:
+                row_counter += 1
+                continue
 
             for m in range(num_members):
                 member_line = member_across_steps(data[variable], m)
@@ -276,7 +301,7 @@ def plot_points(gefs, eps):
         with open(os.path.join(os.getcwd(), 'output', f'{point}.html'), 'w') as f:
             f.write(html_content)
 
-def plot_point_with_range(point_name, points_data_dict, output_dir, gefs=True, eps=False):
+def plot_point_with_range(point_name, points_data_dict, output_dir, gefs=True, eps=False, aifs=False):
     """
     Plot data for a specific point with a custom time range.
     
@@ -286,11 +311,13 @@ def plot_point_with_range(point_name, points_data_dict, output_dir, gefs=True, e
         output_dir: Directory to save the output HTML file
         gefs: Whether GEFS data is included
         eps: Whether EPS data is included
+        aifs: Whether AIFS-E data is included
     """
     if point_name not in points_data_dict or point_name == 'metadata':
         raise ValueError(f"Point '{point_name}' not found in data")
     
     data = points_data_dict[point_name]
+    metadata = points_data_dict.get('metadata', {})
     variables = list(data.keys())
     for key in ['latitude', 'longitude', 'elevation']:
         if key in variables:
@@ -330,13 +357,11 @@ def plot_point_with_range(point_name, points_data_dict, output_dir, gefs=True, e
         else:
             y_min, y_max = 0, 1
 
+        num_members = infer_num_members(data, metadata, gefs, eps, aifs)
         member_lines = []
-        if gefs and eps:
-            num_members = 80
-        elif eps and not gefs:
-            num_members = 50
-        elif gefs and not eps:
-            num_members = 30
+        if num_members == 0:
+            row_counter += 1
+            continue
 
         # Handle variable dimensions for both multi-member and scalar datasets
         variable_data = np.array(data[variable])

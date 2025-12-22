@@ -83,6 +83,7 @@ def main(args):
     delta_t = args.delta_t
     eps = args.eps
     gefs = args.gefs
+    aifs = args.aifs
 
     if not os.path.exists('data'):
         os.makedirs('data')
@@ -95,7 +96,10 @@ def main(args):
         'date': date,
         'cycle': cycle,
         'starting_step': starting_step,
-        'ending_step': ending_step
+        'ending_step': ending_step,
+        'eps': eps,
+        'gefs': gefs,
+        'aifs': aifs
     }
     with open('points.txt') as f:
         for line in f:
@@ -141,18 +145,41 @@ def main(args):
         print(f"Processing step: {step}")
 
         try:
-            asyncio.run(ingest.ingest(date, cycle, step, gefs, eps))
+            asyncio.run(ingest.ingest(date, cycle, step, gefs, eps, aifs))
         except Exception as e:
             print(f"Error during ingestion for step {step}: {e}")
             step_durations.append(time.time() - step_start_time)
             continue
 
+        ds = None
+        ensemble_counts = {}
+        ensemble_order = []
+
         if eps:
             try:
-                ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'ecmwf_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
-                ds = dataset_processing.crop(ds, points_list)
+                eps_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'ecmwf_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                eps_ds = dataset_processing.crop(eps_ds, points_list)
+                ensemble_counts['eps'] = eps_ds.sizes.get('number', 0)
+                ensemble_order.append('eps')
+                ds = xr.concat([ds, eps_ds], dim='number') if ds is not None else eps_ds
             except Exception as e:
                 print(f"Error loading EPS dataset for step {step}: {e}")
+                step_durations.append(time.time() - step_start_time)
+                continue
+
+        if aifs:
+            try:
+                aifs_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'aifs_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                if 'gh' not in aifs_ds and 'z' in aifs_ds:
+                    # Convert geopotential (m^2/s^2) to geopotential height (m).
+                    aifs_ds['z'] = aifs_ds['z'] / 9.80665
+                    aifs_ds = aifs_ds.rename({'z': 'gh'})
+                aifs_ds = dataset_processing.crop(aifs_ds, points_list)
+                ensemble_counts['aifs'] = aifs_ds.sizes.get('number', 0)
+                ensemble_order.append('aifs')
+                ds = xr.concat([ds, aifs_ds], dim='number') if ds is not None else aifs_ds
+            except Exception as e:
+                print(f"Error loading AIFS-E dataset for step {step}: {e}")
                 step_durations.append(time.time() - step_start_time)
                 continue
 
@@ -172,17 +199,18 @@ def main(args):
 
                 gefs_ds = xr.merge([gefs_ds, p_gefs_ds])
                 
-                if eps:
-                    ds = xr.concat([ds, gefs_ds], dim='number')
-                else:
-                    ds = gefs_ds
+                ensemble_counts['gefs'] = gefs_ds.sizes.get('number', 0)
+                ensemble_order.append('gefs')
+                ds = xr.concat([ds, gefs_ds], dim='number') if ds is not None else gefs_ds
             except Exception as e:
                 print(f"Error loading GEFS dataset for step {step}: {e}")
                 step_durations.append(time.time() - step_start_time)
                 continue
 
         try:
-            point_data_dict = points_processing.process_frame(point_data_dict, ds, step, starting_step, delta_t, gefs, eps)
+            point_data_dict['metadata']['ensemble_counts'] = ensemble_counts
+            point_data_dict['metadata']['ensemble_order'] = ensemble_order
+            point_data_dict = points_processing.process_frame(point_data_dict, ds, step, starting_step, delta_t, gefs, eps, aifs)
         except Exception as e:
             print(f"Error processing frame for step {step}: {e}")
             step_durations.append(time.time() - step_start_time)
@@ -198,7 +226,7 @@ def main(args):
         if step % 6 == 0 or step == ending_step:
             try:
                 points_processing.interpolate_hourly(delta_t)
-                plot_points.plot_points(gefs, eps)
+                plot_points.plot_points(gefs, eps, aifs)
             except Exception as e:
                 print(f"Error during interpolation or plotting for step {step}: {e}")
                 continue
@@ -217,6 +245,7 @@ if __name__ == '__main__':
     parser.add_argument('--delta_t', type=int, required=True, help='Delta time')
     parser.add_argument('--eps', type=lambda x: (str(x).lower() == 'true'), required=True, help='EPS True/False')
     parser.add_argument('--gefs', type=lambda x: (str(x).lower() == 'true'), required=True, help='GEFS True/False')
+    parser.add_argument('--aifs', type=lambda x: (str(x).lower() == 'true'), required=True, help='AIFS-E True/False')
 
     args = parser.parse_args()
     main(args)

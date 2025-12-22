@@ -91,15 +91,17 @@ def index():
         delta_t = request.form.get('delta_t') or '3'
         EPS = request.form.get('EPS') or 'False'
         GEFS = request.form.get('GEFS') or 'True'
+        AIFS_E = request.form.get('AIFS_E') or 'False'
 
         # Validate inputs
-        if not all([date, cycle, starting_step, ending_step, delta_t, EPS, GEFS]):
+        if not all([date, cycle, starting_step, ending_step, delta_t, EPS, GEFS, AIFS_E]):
             flash('All fields are required.', 'error')
             return redirect(url_for('index'))
 
-        # Convert EPS and GEFS to boolean
+        # Convert EPS, GEFS, and AIFS-E to boolean
         eps = True if EPS == 'True' else False
         gefs = True if GEFS == 'True' else False
+        aifs = True if AIFS_E == 'True' else False
 
         # Validate numeric fields
         try:
@@ -108,6 +110,10 @@ def index():
             delta_t = int(delta_t)
         except ValueError:
             flash('Starting Step, Ending Step, and Delta_t must be integers.', 'error')
+            return redirect(url_for('index'))
+
+        if aifs and delta_t != 6:
+            flash('Delta_t must be 6 when AIFS-E is True.', 'error')
             return redirect(url_for('index'))
 
         # Check if a model is already running
@@ -159,10 +165,11 @@ def index():
                 '--ending_step', str(ending_step),
                 '--delta_t', str(delta_t),
                 '--eps', str(eps),
-                '--gefs', str(gefs)
+                '--gefs', str(gefs),
+                '--aifs', str(aifs)
             ])
             # print the command
-            print(f"Running command: {sys.executable} {MODEL_SCRIPT} --date {date} --cycle {cycle} --starting_step {starting_step} --ending_step {ending_step} --delta_t {delta_t} --eps {eps} --gefs {gefs}")
+            print(f"Running command: {sys.executable} {MODEL_SCRIPT} --date {date} --cycle {cycle} --starting_step {starting_step} --ending_step {ending_step} --delta_t {delta_t} --eps {eps} --gefs {gefs} --aifs {aifs}")
             flash('Model is running. Check the <a href="{}">output visualization page</a> for results over the next few minutes as the model begins to run.'.format(url_for('outputs')), 'success')
         except Exception as e:
             flash(f'Error running model: {e}', 'error')
@@ -365,18 +372,18 @@ def view_range(point):
             
             # Use plot_points.plot_specific_range to generate the plot
             try:
-                # Determine if we're using GEFS and/or EPS from metadata if available
+                # Determine if we're using GEFS, EPS, and/or AIFS-E from metadata if available
                 gefs = True
                 eps = False
+                aifs = False
                 if 'metadata' in points_data:
-                    # If metadata exists, try to extract GEFS/EPS info
-                    # This is a placeholder - you'd need to modify how you determine if GEFS/EPS
-                    # is being used based on your actual metadata structure
-                    pass
+                    gefs = points_data['metadata'].get('gefs', gefs)
+                    eps = points_data['metadata'].get('eps', eps)
+                    aifs = points_data['metadata'].get('aifs', aifs)
                 
                 # Custom plot function for time range plotting
                 from src.plotting.plot_points import plot_point_with_range
-                plot_point_with_range(decoded_point, filtered_data, temp_output_dir, gefs, eps)
+                plot_point_with_range(decoded_point, filtered_data, temp_output_dir, gefs, eps, aifs)
                 
                 # Read the generated plot
                 temp_html_path = os.path.join(temp_output_dir, f"{decoded_point}.html") 

@@ -14,8 +14,9 @@ import src.processing.dataset as dataset_processing
 import src.processing.points as points_processing
 import src.plotting.plot_points as plot_points
 
-PROGRESS_FILE = os.path.join(os.getcwd(), 'data', 'progress.json')
+PROGRESS_FILE = os.path.join(os.getcwd(), "data", "progress.json")
 terminate = False
+
 
 def signal_handler(signum, frame):
     global terminate
@@ -23,9 +24,11 @@ def signal_handler(signum, frame):
     print("Termination signal received. Exiting gracefully...")
     sys.exit(0)
 
+
 # Register the signal handler for graceful termination
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
+
 
 def update_progress(current_step_num, total_steps, delta_t, step_durations, start_time):
     if terminate:
@@ -47,10 +50,12 @@ def update_progress(current_step_num, total_steps, delta_t, step_durations, star
     # Calculate remaining hours
     remaining_hours = total_hours - current_hours
     # Estimate remaining time
-    estimated_remaining_seconds = average_time_per_hour * (remaining_hours/delta_t)
+    estimated_remaining_seconds = average_time_per_hour * (remaining_hours / delta_t)
 
     # Calculate predicted finish time
-    predicted_finish_time = current_time + timedelta(seconds=int(estimated_remaining_seconds))
+    predicted_finish_time = current_time + timedelta(
+        seconds=int(estimated_remaining_seconds)
+    )
 
     # Convert predicted_finish_time to an ISO formatted string
     predicted_finish_time_str = predicted_finish_time.isoformat()
@@ -58,7 +63,9 @@ def update_progress(current_step_num, total_steps, delta_t, step_durations, star
     # Format as HH:MM:SS (keeping for compatibility)
     estimated_time_remaining = str(timedelta(seconds=int(estimated_remaining_seconds)))
 
-    percentage = math.floor((current_hours / total_hours) * 100) if total_steps > 0 else 100
+    percentage = (
+        math.floor((current_hours / total_hours) * 100) if total_steps > 0 else 100
+    )
     percentage = max(0, min(percentage, 100))  # Ensure progress is between 0 and 100
 
     progress_data = {
@@ -66,13 +73,14 @@ def update_progress(current_step_num, total_steps, delta_t, step_durations, star
         "current": current_hours,
         "total": total_hours,
         "estimated_time_remaining": estimated_time_remaining,
-        "predicted_finish_time": predicted_finish_time_str  # Added predicted_finish_time to progress data
+        "predicted_finish_time": predicted_finish_time_str,  # Added predicted_finish_time to progress data
     }
     try:
-        with open(PROGRESS_FILE, 'w') as f:
+        with open(PROGRESS_FILE, "w") as f:
             json.dump(progress_data, f)
     except Exception as e:
         print(f"Error updating progress: {e}")
+
 
 def main(args):
     global terminate
@@ -85,44 +93,65 @@ def main(args):
     gefs = args.gefs
     aifs = args.aifs
 
-    if not os.path.exists('data'):
-        os.makedirs('data')
-    if not os.path.exists('output'):
-        os.makedirs('output')
+    if not os.path.exists("data"):
+        os.makedirs("data")
+    if not os.path.exists("output"):
+        os.makedirs("output")
+    grib_dir = os.path.join(os.getcwd(), "data", "grib", str(date), f"{cycle}")
+    os.makedirs(grib_dir, exist_ok=True)
 
     points_list = []
     point_data_dict = {}
-    point_data_dict['metadata'] = {
-        'date': date,
-        'cycle': cycle,
-        'starting_step': starting_step,
-        'ending_step': ending_step,
-        'eps': eps,
-        'gefs': gefs,
-        'aifs': aifs
+    point_data_dict["metadata"] = {
+        "date": date,
+        "cycle": cycle,
+        "starting_step": starting_step,
+        "ending_step": ending_step,
+        "eps": eps,
+        "gefs": gefs,
+        "aifs": aifs,
     }
-    with open('points.txt') as f:
+    with open("points.txt") as f:
         for line in f:
             if line.strip() == "":
                 continue  # Skip empty lines
             try:
-                name, lat, lon, elevation = line.strip().split(',')
+                name, lat, lon, elevation = line.strip().split(",")
                 points_list.append([name, float(lat), float(lon), float(elevation)])
                 # Updated initialization for exceedance probabilities
                 point_data_dict[name] = {
-                    'latitude': float(lat),
-                    'longitude': float(lon),
-                    'elevation': float(elevation),
-                    'slr_exceedance_probabilities': {5: [], 8: [], 10: [], 12: [], 15: [], 20: [], 25: []},
-                    'total_snow_exceedance_probabilities': {1: [], 3: [], 6: [], 12: [], 18: [], 24: [], 36: [], 48: [], 60: [], 100: []},
-                    'snow': [], 
-                    'total_snow': [],
-                    'tp': [],
-                    'total_tp': [],
-                    'slr': [],
-                    'temp': [],
-                    'snow_level': [],
-                    'times': []
+                    "latitude": float(lat),
+                    "longitude": float(lon),
+                    "elevation": float(elevation),
+                    "slr_exceedance_probabilities": {
+                        5: [],
+                        8: [],
+                        10: [],
+                        12: [],
+                        15: [],
+                        20: [],
+                        25: [],
+                    },
+                    "total_snow_exceedance_probabilities": {
+                        1: [],
+                        3: [],
+                        6: [],
+                        12: [],
+                        18: [],
+                        24: [],
+                        36: [],
+                        48: [],
+                        60: [],
+                        100: [],
+                    },
+                    "snow": [],
+                    "total_snow": [],
+                    "tp": [],
+                    "total_tp": [],
+                    "slr": [],
+                    "temp": [],
+                    "snow_level": [],
+                    "times": [],
                 }
             except ValueError:
                 print(f"Invalid line in points.txt: {line.strip()}")
@@ -130,7 +159,7 @@ def main(args):
     if delta_t == 6 and starting_step == 3:
         starting_step = 6
 
-    steps = list(range(starting_step, ending_step +1, delta_t))
+    steps = list(range(starting_step, ending_step + 1, delta_t))
     total_steps = len(steps)
     single_step_run = total_steps == 1
 
@@ -146,7 +175,9 @@ def main(args):
         print(f"Processing step: {step}")
 
         try:
-            downloaded = asyncio.run(ingest.ingest(date, cycle, step, gefs, eps, aifs))
+            downloaded = asyncio.run(
+                ingest.ingest(date, cycle, step, gefs, eps, aifs, data_dir=grib_dir)
+            )
         except Exception as e:
             print(f"Error during ingestion for step {step}: {e}")
             step_durations.append(time.time() - step_start_time)
@@ -158,16 +189,37 @@ def main(args):
 
         if eps:
             try:
-                eps_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'ecmwf_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                eps_ds = xr.load_dataset(
+                    os.path.join(grib_dir, f"ecmwf_{step}.grib2"),
+                    engine="cfgrib",
+                    filter_by_keys={"dataType": "pf"},
+                )
             except Exception as e:
-                if not downloaded.get('eps', False):
+                if not downloaded.get("eps", False):
                     print(f"Retrying EPS download after load failure: {e}")
                     try:
-                        asyncio.run(ingest.ingest(date, cycle, step, gefs=False, eps=True, aifs=False, force=True))
-                        downloaded['eps'] = True
-                        eps_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'ecmwf_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                        asyncio.run(
+                            ingest.ingest(
+                                date,
+                                cycle,
+                                step,
+                                gefs=False,
+                                eps=True,
+                                aifs=False,
+                                force=True,
+                                data_dir=grib_dir,
+                            )
+                        )
+                        downloaded["eps"] = True
+                        eps_ds = xr.load_dataset(
+                            os.path.join(grib_dir, f"ecmwf_{step}.grib2"),
+                            engine="cfgrib",
+                            filter_by_keys={"dataType": "pf"},
+                        )
                     except Exception as retry_error:
-                        print(f"Error loading EPS dataset for step {step}: {retry_error}")
+                        print(
+                            f"Error loading EPS dataset for step {step}: {retry_error}"
+                        )
                         step_durations.append(time.time() - step_start_time)
                         continue
                 else:
@@ -176,9 +228,9 @@ def main(args):
                     continue
             try:
                 eps_ds = dataset_processing.crop(eps_ds, points_list)
-                ensemble_counts['eps'] = eps_ds.sizes.get('number', 0)
-                ensemble_order.append('eps')
-                ds = xr.concat([ds, eps_ds], dim='number') if ds is not None else eps_ds
+                ensemble_counts["eps"] = eps_ds.sizes.get("number", 0)
+                ensemble_order.append("eps")
+                ds = xr.concat([ds, eps_ds], dim="number") if ds is not None else eps_ds
             except Exception as e:
                 print(f"Error loading EPS dataset for step {step}: {e}")
                 step_durations.append(time.time() - step_start_time)
@@ -186,22 +238,49 @@ def main(args):
 
         if aifs:
             try:
-                aifs_path = os.path.join(os.getcwd(), 'data', f'aifs_{step}.grib2')
+                aifs_path = os.path.join(grib_dir, f"aifs_{step}.grib2")
+
                 def load_aifs_dataset(path):
-                    aifs_t = xr.load_dataset(path, engine='cfgrib', filter_by_keys={'dataType': 'pf', 'paramId': 130})
-                    aifs_z = xr.load_dataset(path, engine='cfgrib', filter_by_keys={'dataType': 'pf', 'paramId': 129})
-                    aifs_tp = xr.load_dataset(path, engine='cfgrib', filter_by_keys={'dataType': 'pf', 'shortName': 'tp'})
+                    aifs_t = xr.load_dataset(
+                        path,
+                        engine="cfgrib",
+                        filter_by_keys={"dataType": "pf", "paramId": 130},
+                    )
+                    aifs_z = xr.load_dataset(
+                        path,
+                        engine="cfgrib",
+                        filter_by_keys={"dataType": "pf", "paramId": 129},
+                    )
+                    aifs_tp = xr.load_dataset(
+                        path,
+                        engine="cfgrib",
+                        filter_by_keys={"dataType": "pf", "shortName": "tp"},
+                    )
                     return xr.merge([aifs_t, aifs_z, aifs_tp])
+
                 aifs_ds = load_aifs_dataset(aifs_path)
             except Exception as e:
-                if not downloaded.get('aifs', False):
+                if not downloaded.get("aifs", False):
                     print(f"Retrying AIFS download after load failure: {e}")
                     try:
-                        asyncio.run(ingest.ingest(date, cycle, step, gefs=False, eps=False, aifs=True, force=True))
-                        downloaded['aifs'] = True
+                        asyncio.run(
+                            ingest.ingest(
+                                date,
+                                cycle,
+                                step,
+                                gefs=False,
+                                eps=False,
+                                aifs=True,
+                                force=True,
+                                data_dir=grib_dir,
+                            )
+                        )
+                        downloaded["aifs"] = True
                         aifs_ds = load_aifs_dataset(aifs_path)
                     except Exception as retry_error:
-                        print(f"Error loading AIFS-E dataset for step {step}: {retry_error}")
+                        print(
+                            f"Error loading AIFS-E dataset for step {step}: {retry_error}"
+                        )
                         step_durations.append(time.time() - step_start_time)
                         continue
                 else:
@@ -209,22 +288,30 @@ def main(args):
                     step_durations.append(time.time() - step_start_time)
                     continue
             try:
-                if 'gh' not in aifs_ds and 'z' in aifs_ds:
+                if "gh" not in aifs_ds and "z" in aifs_ds:
                     # Convert geopotential (m^2/s^2) to geopotential height (m).
-                    aifs_ds['z'] = aifs_ds['z'] / 9.80665
-                    aifs_ds = aifs_ds.rename({'z': 'gh'})
-                if 'tp' in aifs_ds:
-                    tp_units = (aifs_ds['tp'].attrs.get('units') or '').strip().lower()
+                    aifs_ds["z"] = aifs_ds["z"] / 9.80665
+                    aifs_ds = aifs_ds.rename({"z": "gh"})
+                if "tp" in aifs_ds:
+                    tp_units = (aifs_ds["tp"].attrs.get("units") or "").strip().lower()
                     if not tp_units:
-                        tp_units = (aifs_ds['tp'].attrs.get('GRIB_units') or '').strip().lower()
-                    if tp_units in ('mm', 'kg m-2', 'kg m**-2', 'kg m^-2', 'kg/m^2'):
+                        tp_units = (
+                            (aifs_ds["tp"].attrs.get("GRIB_units") or "")
+                            .strip()
+                            .lower()
+                        )
+                    if tp_units in ("mm", "kg m-2", "kg m**-2", "kg m^-2", "kg/m^2"):
                         # Normalize AIFS tp to meters to match EPS handling downstream.
-                        aifs_ds['tp'] = aifs_ds['tp'] / 1000.0
-                        aifs_ds['tp'].attrs['units'] = 'm'
+                        aifs_ds["tp"] = aifs_ds["tp"] / 1000.0
+                        aifs_ds["tp"].attrs["units"] = "m"
                 aifs_ds = dataset_processing.crop(aifs_ds, points_list)
-                ensemble_counts['aifs'] = aifs_ds.sizes.get('number', 0)
-                ensemble_order.append('aifs')
-                ds = xr.concat([ds, aifs_ds], dim='number') if ds is not None else aifs_ds
+                ensemble_counts["aifs"] = aifs_ds.sizes.get("number", 0)
+                ensemble_order.append("aifs")
+                ds = (
+                    xr.concat([ds, aifs_ds], dim="number")
+                    if ds is not None
+                    else aifs_ds
+                )
             except Exception as e:
                 print(f"Error loading AIFS-E dataset for step {step}: {e}")
                 step_durations.append(time.time() - step_start_time)
@@ -232,16 +319,37 @@ def main(args):
 
         if gefs:
             try:
-                gefs_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'gefs_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                gefs_ds = xr.load_dataset(
+                    os.path.join(grib_dir, f"gefs_{step}.grib2"),
+                    engine="cfgrib",
+                    filter_by_keys={"dataType": "pf"},
+                )
             except Exception as e:
-                if not downloaded.get('gefs', False):
+                if not downloaded.get("gefs", False):
                     print(f"Retrying GEFS download after load failure: {e}")
                     try:
-                        asyncio.run(ingest.ingest(date, cycle, step, gefs=True, eps=False, aifs=False, force=True))
-                        downloaded['gefs'] = True
-                        gefs_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'gefs_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                        asyncio.run(
+                            ingest.ingest(
+                                date,
+                                cycle,
+                                step,
+                                gefs=True,
+                                eps=False,
+                                aifs=False,
+                                force=True,
+                                data_dir=grib_dir,
+                            )
+                        )
+                        downloaded["gefs"] = True
+                        gefs_ds = xr.load_dataset(
+                            os.path.join(grib_dir, f"gefs_{step}.grib2"),
+                            engine="cfgrib",
+                            filter_by_keys={"dataType": "pf"},
+                        )
                     except Exception as retry_error:
-                        print(f"Error loading GEFS dataset for step {step}: {retry_error}")
+                        print(
+                            f"Error loading GEFS dataset for step {step}: {retry_error}"
+                        )
                         step_durations.append(time.time() - step_start_time)
                         continue
                 else:
@@ -250,57 +358,98 @@ def main(args):
                     continue
             try:
                 if step != 3 and step % 6 == 0 and delta_t == 3:
-                    prior_gefs_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'gefs_{step-3}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                    prior_gefs_ds = xr.load_dataset(
+                        os.path.join(grib_dir, f"gefs_{step - 3}.grib2"),
+                        engine="cfgrib",
+                        filter_by_keys={"dataType": "pf"},
+                    )
                     gefs_ds = gefs_ds - prior_gefs_ds
-                gefs_ds = gefs_ds.assign_coords(longitude=(((gefs_ds.longitude + 180) % 360) - 180)).sortby('longitude')
+                gefs_ds = gefs_ds.assign_coords(
+                    longitude=(((gefs_ds.longitude + 180) % 360) - 180)
+                ).sortby("longitude")
                 gefs_ds = dataset_processing.crop(gefs_ds, points_list)
 
                 try:
-                    p_gefs_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'p_gefs_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                    p_gefs_ds = xr.load_dataset(
+                        os.path.join(grib_dir, f"p_gefs_{step}.grib2"),
+                        engine="cfgrib",
+                        filter_by_keys={"dataType": "pf"},
+                    )
                 except Exception as e:
-                    if not downloaded.get('p_gefs', False):
-                        print(f"Retrying GEFS pressure-level download after load failure: {e}")
+                    if not downloaded.get("p_gefs", False):
+                        print(
+                            f"Retrying GEFS pressure-level download after load failure: {e}"
+                        )
                         try:
-                            asyncio.run(ingest.ingest(date, cycle, step, gefs=True, eps=False, aifs=False, force=True))
-                            downloaded['p_gefs'] = True
-                            p_gefs_ds = xr.load_dataset(os.path.join(os.getcwd(), 'data', f'p_gefs_{step}.grib2'), engine='cfgrib', filter_by_keys={'dataType': 'pf'})
+                            asyncio.run(
+                                ingest.ingest(
+                                    date,
+                                    cycle,
+                                    step,
+                                    gefs=True,
+                                    eps=False,
+                                    aifs=False,
+                                    force=True,
+                                    data_dir=grib_dir,
+                                )
+                            )
+                            downloaded["p_gefs"] = True
+                            p_gefs_ds = xr.load_dataset(
+                                os.path.join(grib_dir, f"p_gefs_{step}.grib2"),
+                                engine="cfgrib",
+                                filter_by_keys={"dataType": "pf"},
+                            )
                         except Exception as retry_error:
-                            print(f"Error loading GEFS dataset for step {step}: {retry_error}")
+                            print(
+                                f"Error loading GEFS dataset for step {step}: {retry_error}"
+                            )
                             step_durations.append(time.time() - step_start_time)
                             continue
                     else:
                         print(f"Error loading GEFS dataset for step {step}: {e}")
                         step_durations.append(time.time() - step_start_time)
                         continue
-                p_gefs_ds = p_gefs_ds.assign_coords(longitude=(((p_gefs_ds.longitude + 180) % 360) - 180)).sortby('longitude')
+                p_gefs_ds = p_gefs_ds.assign_coords(
+                    longitude=(((p_gefs_ds.longitude + 180) % 360) - 180)
+                ).sortby("longitude")
                 p_gefs_ds = dataset_processing.crop(p_gefs_ds, points_list)
-                p_gefs_ds = p_gefs_ds.interp(latitude=gefs_ds.latitude, longitude=gefs_ds.longitude)
+                p_gefs_ds = p_gefs_ds.interp(
+                    latitude=gefs_ds.latitude, longitude=gefs_ds.longitude
+                )
 
                 gefs_ds = xr.merge([gefs_ds, p_gefs_ds])
-                
-                ensemble_counts['gefs'] = gefs_ds.sizes.get('number', 0)
-                ensemble_order.append('gefs')
-                ds = xr.concat([ds, gefs_ds], dim='number') if ds is not None else gefs_ds
+
+                ensemble_counts["gefs"] = gefs_ds.sizes.get("number", 0)
+                ensemble_order.append("gefs")
+                ds = (
+                    xr.concat([ds, gefs_ds], dim="number")
+                    if ds is not None
+                    else gefs_ds
+                )
             except Exception as e:
                 print(f"Error loading GEFS dataset for step {step}: {e}")
                 step_durations.append(time.time() - step_start_time)
                 continue
 
         try:
-            point_data_dict['metadata']['ensemble_counts'] = ensemble_counts
-            point_data_dict['metadata']['ensemble_order'] = ensemble_order
-            point_data_dict = points_processing.process_frame(point_data_dict, ds, step, starting_step, delta_t, gefs, eps, aifs)
+            point_data_dict["metadata"]["ensemble_counts"] = ensemble_counts
+            point_data_dict["metadata"]["ensemble_order"] = ensemble_order
+            point_data_dict = points_processing.process_frame(
+                point_data_dict, ds, step, starting_step, delta_t, gefs, eps, aifs
+            )
         except Exception as e:
             print(f"Error processing frame for step {step}: {e}")
             step_durations.append(time.time() - step_start_time)
             continue
 
-        print(f'Frame runtime: {time.time() - step_start_time:.2f} seconds')
+        print(f"Frame runtime: {time.time() - step_start_time:.2f} seconds")
         step_duration = time.time() - step_start_time
         step_durations.append(step_duration)
 
-        current_step_num = steps.index(step) +1  # 1-based index
-        update_progress(current_step_num, total_steps, delta_t, step_durations, start_time)
+        current_step_num = steps.index(step) + 1  # 1-based index
+        update_progress(
+            current_step_num, total_steps, delta_t, step_durations, start_time
+        )
 
         if not single_step_run and (step % 6 == 0 or step == ending_step):
             try:
@@ -315,16 +464,34 @@ def main(args):
     else:
         update_progress(0, total_steps, delta_t, step_durations, start_time)
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Run Snowfall Forecast Model')
-    parser.add_argument('--date', required=True, help='Date in YYYYMMDD format')
-    parser.add_argument('--cycle', required=True, help='Cycle number')
-    parser.add_argument('--starting_step', type=int, required=True, help='Starting step')
-    parser.add_argument('--ending_step', type=int, required=True, help='Ending step')
-    parser.add_argument('--delta_t', type=int, required=True, help='Delta time')
-    parser.add_argument('--eps', type=lambda x: (str(x).lower() == 'true'), required=True, help='EPS True/False')
-    parser.add_argument('--gefs', type=lambda x: (str(x).lower() == 'true'), required=True, help='GEFS True/False')
-    parser.add_argument('--aifs', type=lambda x: (str(x).lower() == 'true'), required=True, help='AIFS-E True/False')
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run Snowfall Forecast Model")
+    parser.add_argument("--date", required=True, help="Date in YYYYMMDD format")
+    parser.add_argument("--cycle", required=True, help="Cycle number")
+    parser.add_argument(
+        "--starting_step", type=int, required=True, help="Starting step"
+    )
+    parser.add_argument("--ending_step", type=int, required=True, help="Ending step")
+    parser.add_argument("--delta_t", type=int, required=True, help="Delta time")
+    parser.add_argument(
+        "--eps",
+        type=lambda x: (str(x).lower() == "true"),
+        required=True,
+        help="EPS True/False",
+    )
+    parser.add_argument(
+        "--gefs",
+        type=lambda x: (str(x).lower() == "true"),
+        required=True,
+        help="GEFS True/False",
+    )
+    parser.add_argument(
+        "--aifs",
+        type=lambda x: (str(x).lower() == "true"),
+        required=True,
+        help="AIFS-E True/False",
+    )
 
     args = parser.parse_args()
     main(args)

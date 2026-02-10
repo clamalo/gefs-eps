@@ -147,6 +147,10 @@ See the [Python website](https://www.python.org/downloads/) for Python installat
   - Ensure you have an active internet connection.
   - If automatic elevation fetching fails, manually enter the elevation when adding a point.
 
+- **Having to delete the `data` folder between runs**
+  - GRIB downloads are now cached by date and cycle under `data/grib/YYYYMMDD/CYCLE/`. You can rerun the model without deleting `data/`.
+  - If you want to free disk space or force a completely clean re-download, delete the relevant folder under `data/grib/`.
+
 - **Model not running**
 
   - Check if all required fields are filled correctly.
